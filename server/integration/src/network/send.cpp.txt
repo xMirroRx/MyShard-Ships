@@ -1,0 +1,86 @@
+// Excerpt of MyShard-Server/src/network/send.cpp
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 4298-4350 -----
+ 4298| 	writeInt16(0);			// version
+ 4299| 	writeInt32(serial);		// the player whose weapon glows
+ 4300| 	writeInt16(mask);		// active weapon-glow bitmask (one bit per weapon type; 0 = none)
+ 4301| 
+ 4302| 	push(target);
+ 4303| }
+ 4304| 
+ 4305| /***************************************************************************
+ 4306|  *
+ 4307|  *
+ 4308|  *	Packet 0xCE : PacketShipGlowState	(custom) MyShard: a ship (serial) glow on/off -> every online player sees
+ 4309|  *										the whole ship light up while its pilot has the helm.
+ 4310|  *
+ 4311|  *
+ 4312|  ***************************************************************************/
+ 4313| PacketShipGlowState::PacketShipGlowState(const CClient* target, dword shipSerial, byte on)
+ 4314| 	: PacketSend(0xCE, 0, PRI_NORMAL)
+ 4315| {
+ 4316| 	ADDTOCALLSTACK("PacketShipGlowState::PacketShipGlowState");
+ 4317| 
+ 4318| 	initLength();			// 2-byte length, finalized on send
+ 4319| 	writeInt16(35);			// EnhancedPacketType.ShipGlowState
+ 4320| 	writeInt16(0);			// version
+ 4321| 	writeInt32(shipSerial);	// the ship (multi item) that should glow
+ 4322| 	writeByte(on);			// 1 = glow on, 0 = off
+ 4323| 
+ 4324| 	push(target);
+ 4325| }
+ 4326| 
+ 4327| /***************************************************************************
+ 4328|  *
+ 4329|  *
+ 4330|  *	Packet 0xCE : PacketShipDyeState	(custom) MyShard: recolour a ship part (serial) to a UO hue for everyone.
+ 4331|  *
+ 4332|  *
+ 4333|  ***************************************************************************/
+ 4334| PacketShipDyeState::PacketShipDyeState(const CClient* target, dword shipSerial, word hue)
+ 4335| 	: PacketSend(0xCE, 0, PRI_NORMAL)
+ 4336| {
+ 4337| 	ADDTOCALLSTACK("PacketShipDyeState::PacketShipDyeState");
+ 4338| 
+ 4339| 	initLength();			// 2-byte length, finalized on send
+ 4340| 	writeInt16(40);			// EnhancedPacketType.ShipDyeState
+ 4341| 	writeInt16(0);			// version
+ 4342| 	writeInt32(shipSerial);	// the ship part (multi tile / component item) to recolour
+ 4343| 	writeInt16(hue);		// UO hue (0 = clear the dye)
+ 4344| 
+ 4345| 	push(target);
+ 4346| }
+ 4347| 
+ 4348| /***************************************************************************
+ 4349|  *
+ 4350|  *
+
+// ----- lines 6348-6374 -----
+ 6348| 
+ 6349| bool PacketDisplayMapNew::CanSendTo(const CNetState* state) // static
+ 6350| {
+ 6351|     return state->isClientVersionNumber(MINCLIVER_NEWMAPDISPLAY) || state->isClientEnhanced();
+ 6352| }
+ 6353| 
+ 6354| 
+ 6355| /***************************************************************************
+ 6356|  *
+ 6357|  *
+ 6358|  *	Packet 0xF6 : PacketMoveShip			move ship (NORMAL)
+ 6359|  *
+ 6360|  *
+ 6361|  ***************************************************************************/
+ 6362| PacketMoveShip::PacketMoveShip(const CClient* target, const CObjBase* movingObj, CObjBase** objects, uint objectCount, byte movedirection, byte boatdirection, byte speed) : PacketSend(XCMD_MoveShip, 18, PRI_NORMAL)
+ 6363| {
+ 6364| 	ADDTOCALLSTACK("PacketMoveShip::PacketMoveShip");
+ 6365| 	ASSERT(objectCount > 0);
+ 6366| 	const CPointMap& shipLocation = movingObj->GetTopPoint();
+ 6367| 
+ 6368| 	initLength();
+ 6369| 	writeInt32(movingObj->GetUID());
+ 6370| 	writeByte(speed);
+ 6371| 	writeByte(movedirection);
+ 6372| 	writeByte(boatdirection);
+ 6373| 	writeInt16(shipLocation.m_x);
+ 6374| 	writeInt16(shipLocation.m_y);

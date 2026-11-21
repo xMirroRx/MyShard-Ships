@@ -1,0 +1,25 @@
+// Excerpt of MyShard-Server/src/game/clients/CClientEvent.cpp
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 1740-1760 -----
+ 1740| 			pszReName = g_Cfg.GetDefaultMsg(DEFMSG_RUNE_NAME);
+ 1741| 			pszPrefix = g_Cfg.GetDefaultMsg(DEFMSG_RUNE_TO);
+ 1742| 			break;
+ 1743| 
+ 1744| 		case CLIMODE_PROMPT_NAME_KEY:
+ 1745| 			pszReName = g_Cfg.GetDefaultMsg(DEFMSG_KEY_NAME);
+ 1746| 			pszPrefix = g_Cfg.GetDefaultMsg(DEFMSG_KEY_TO);
+ 1747| 			break;
+ 1748| 
+ 1749| 		case CLIMODE_PROMPT_NAME_SHIP:
+ 1750| 			pszReName = "Ship";
+ 1751| 			pszPrefix = "SS ";
+ 1752| 			break;
+ 1753| 
+ 1754| 		case CLIMODE_PROMPT_NAME_SIGN:
+ 1755| 			pszReName = "Sign";
+ 1756| 			pszPrefix = "";
+ 1757| 			break;
+ 1758| 
+ 1759| 		case CLIMODE_PROMPT_STONE_NAME:
+ 1760| 			pszReName = g_Cfg.GetDefaultMsg(DEFMSG_STONE_NAME);

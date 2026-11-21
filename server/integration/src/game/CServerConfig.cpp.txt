@@ -1,0 +1,48 @@
+// Excerpt of MyShard-Server/src/game/CServerConfig.cpp
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 1789-1809 -----
+ 1789| 				for (size_t i = 0; i < g_World.m_Multis.size(); ++i)
+ 1790| 				{
+ 1791| 					pMulti = g_World.m_Multis[i].get();
+ 1792| 					if (pMulti == nullptr)
+ 1793| 						continue;
+ 1794| 
+ 1795| 					if ((pMulti->GetType() == IT_MULTI) && bMulti)
+ 1796| 						++x;
+ 1797| 					else if ((pMulti->GetType() == IT_MULTI_CUSTOM) && bMulti)
+ 1798| 						++x;
+ 1799| 					else if ((pMulti->GetType() == IT_SHIP) && bMulti)
+ 1800| 						++x;
+ 1801| 				}
+ 1802| 
+ 1803| 				sVal.FormatSTVal(x);
+ 1804| 				return true;
+ 1805| 			}
+ 1806| 
+ 1807| 			size_t iNumber = Exp_GetVal(pszCmd);
+ 1808| 			SKIP_SEPARATORS(pszCmd);
+ 1809| 			sVal.SetValFalse();
+
+// ----- lines 1819-1839 -----
+ 1819| 					if (iNumber == x)
+ 1820| 						return pMulti->r_WriteVal(pszCmd, sVal, pSrc);
+ 1821| 					++x;
+ 1822| 				}
+ 1823| 				else if ((pMulti->GetType() == IT_MULTI_CUSTOM) && bMulti)
+ 1824| 				{
+ 1825| 					if (iNumber == x)
+ 1826| 						return pMulti->r_WriteVal(pszCmd, sVal, pSrc);
+ 1827| 					++x;
+ 1828| 				}
+ 1829| 				else if ((pMulti->GetType() == IT_SHIP) && bMulti)
+ 1830| 				{
+ 1831| 					if (iNumber == x)
+ 1832| 						return pMulti->r_WriteVal(pszCmd, sVal, pSrc);
+ 1833| 					++x;
+ 1834| 				}
+ 1835| 			}
+ 1836| 
+ 1837| 			return true;
+ 1838| 		}
+ 1839| 

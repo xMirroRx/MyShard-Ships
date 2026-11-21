@@ -1,0 +1,56 @@
+// Excerpt of MyShard-Client/src/ClassicUO.Client/Game/Scenes/GameSceneInputHandler.cs
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 125-153 -----
+  125| 
+  126|                 Direction facing = direction;
+  127| 
+  128|                 if (facing == Direction.North)
+  129|                 {
+  130|                     facing = (Direction)8;
+  131|                 }
+  132| 
+  133|                 bool run = mouseRange >= 190;
+  134| 
+  135|                 if (_world.Player.IsDrivingBoat && UIManager.GetGump<BoatControl>() == null)
+  136|                 {
+  137|                     if (!_boatIsMoving || _boatRun != run || _lastBoatDirection != facing - 1)
+  138|                     {
+  139|                         _boatRun = run;
+  140|                         _lastBoatDirection = facing - 1;
+  141|                         _boatIsMoving = true;
+  142| 
+  143|                         _world.BoatMovingManager.MoveRequest(facing - 1, (byte)(run ? 2 : 1));
+  144|                     }
+  145|                 }
+  146|                 else
+  147|                 {
+  148|                     _world.Player.Walk(facing - 1, run);
+  149|                 }
+  150| 
+  151|                 return true;
+  152|             }
+  153| 
+
+// ----- lines 1125-1145 -----
+ 1125|             )
+ 1126|             {
+ 1127|                 UIManager.ShowGamePopup(null);
+ 1128|             }
+ 1129| 
+ 1130|             _rightMousePressed = false;
+ 1131| 
+ 1132|             if (_boatIsMoving)
+ 1133|             {
+ 1134|                 _boatIsMoving = false;
+ 1135|                 _world.BoatMovingManager.MoveRequest(_world.Player.Direction, 0);
+ 1136|             }
+ 1137| 
+ 1138|             if (ProfileManager.CurrentProfile.EnablePathfind && ProfileManager.CurrentProfile.PathfindSingleClick)
+ 1139|             {
+ 1140|                 if (ProfileManager.CurrentProfile.UseShiftToPathfind && !Keyboard.Shift)
+ 1141|                 {
+ 1142|                     return false;
+ 1143|                 }
+ 1144| 
+ 1145|                 if (SelectedObject.Object is GameObject obj)

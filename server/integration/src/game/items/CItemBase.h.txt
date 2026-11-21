@@ -1,0 +1,91 @@
+// Excerpt of MyShard-Server/src/game/items/CItemBase.h
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 87-107 -----
+   87| 		struct	// ALL equippable items ex. Weapons and armor
+   88| 		{
+   89| 			dword		    m_junk1;		// TDATA1= Sound it makes ?
+   90| 			dword		    m_iStrReq;		// TDATA2= REQSTR= Strength required to weild weapons/armor.
+   91|             CResourceIDBase m_ridAmmo;		// TDATA3= required source ammo.
+   92|             CResourceIDBase m_ridAmmoX;		// TDATA4= fired ammo fx.
+   93| 		} m_ttWeaponBow;
+   94| 
+   95| 		// IT_CONTAINER
+   96| 		// IT_SIGN_GUMP
+   97| 		// IT_SHIP_HOLD
+   98| 		// IT_BBOARD
+   99| 		// IT_CORPSE
+  100| 		// IT_TRASH_CAN
+  101| 		// IT_GAME_BOARD
+  102| 		// IT_EQ_BANK_BOX
+  103| 		// IT_EQ_VENDOR_BOX
+  104| 		// IT_KEYRING
+  105| 		struct
+  106| 		{
+  107| 			dword m_junk1;
+
+// ----- lines 200-225 -----
+  200| 		// IT_BOOZE
+  201| 		// IT_POTION
+  202| 		// IT_PITCHER
+  203| 		// IT_WATER_WASH
+  204| 		struct
+  205| 		{
+  206|             CResourceIDBase m_ridEmpty;	// tdata1= the empty container. IT_POTION_EMPTY IT_PITCHER_EMPTY
+  207|             dword m_ridDelay; //tdata2= how long someone need to wait to drink again after using it (in seconds).
+  208| 		} m_ttDrink;
+  209| 
+  210| 		// IT_SHIP_PLANK
+  211| 		// IT_SHIP_SIDE
+  212| 		// IT_SHIP_SIDE_LOCKED
+  213| 		struct
+  214| 		{
+  215|             CResourceIDBase m_ridState;	// tdata1= next state open/close for the Ship Side
+  216| 		} m_ttShipPlank;
+  217| 
+  218| 		// IT_MAP
+  219| 		struct
+  220| 		{
+  221| 			dword m_iGumpWidth;	// tdata1= map gump width
+  222| 			dword m_iGumpHeight;// tdata2= map gump height
+  223| 		} m_ttMap;
+  224| 	};
+  225| 
+
+// ----- lines 409-444 -----
+  409| 	static lpctstr const sm_szLoadKeys[];
+  410| public:
+  411| 	static const char *m_sClassName;
+  412| 	struct CMultiComponentItem	// a component item of a multi.
+  413| 	{
+  414| 		ITEMID_TYPE m_id;
+  415| 		short m_dx;
+  416| 		short m_dy;
+  417| 		char m_dz;
+  418| 	};
+  419| 	struct ShipSpeed // speed of a ship
+  420| 	{
+  421| 		ushort period;	// time between movement
+  422| 		uchar tiles;	// distance to move
+  423| 	};
+  424| 
+  425| 	struct MultiOffset
+  426| 	{
+  427| 		short m_dx;
+  428| 		short m_dy;
+  429| 		char m_dz;
+  430| 	};
+  431| 
+  432| 	std::vector<CMultiComponentItem> m_Components;
+  433| 	ShipSpeed _shipSpeed; // Speed of ships (IT_SHIP)
+  434| 	ShipMovementSpeed m_SpeedMode;
+  435| 	CRect m_rect;		// my region.
+  436| 	MultiOffset m_Offset;
+  437| 	dword m_dwRegionFlags;	// Base region flags (REGION_FLAG_GUARDED etc)
+  438| 	CResourceRefArray m_Speech;	// Speech fragment list (other stuff we know)
+  439|     uint16 _iBaseStorage;
+  440|     uint8 _iBaseVendors;
+  441|     uint8 _iLockdownsPercent;
+  442|     uint8 _iMultiCount;     // Count towards char House's count, 0 = no count, 3 = count like 3 houses.
+  443| 
+  444| public:

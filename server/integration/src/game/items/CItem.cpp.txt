@@ -1,0 +1,325 @@
+// Excerpt of MyShard-Server/src/game/items/CItem.cpp
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 25-45 -----
+   25| #include "../CWorldSearch.h"
+   26| #include "../triggers.h"
+   27| #include "CItem.h"
+   28| #include "CItemCommCrystal.h"
+   29| #include "CItemCorpse.h"
+   30| #include "CItemMap.h"
+   31| #include "CItemMemory.h"
+   32| #include "CItemMessage.h"
+   33| #include "CItemMultiCustom.h"
+   34| #include "CItemScript.h"
+   35| #include "CItemShip.h"
+   36| #include "CItemStone.h"
+   37| #include "CItemVendable.h"
+   38| 
+   39| 
+   40| /*
+   41| 	If you add a new trigger here, be sure to also and ALWAYS add a corresponding
+   42| 	character trigger (even if it does not make sense)! CTRIG_item* will be automatically
+   43| 	called when one of these triggers fired, depending on their index. So NEVER unalign the two lists!
+   44| */
+   45| lpctstr const CItem::sm_szTrigName[ITRIG_QTY+1] =	// static
+
+// ----- lines 80-102 -----
+   80| 	"@PICKUP_PACK",	// picked up from inside some container.
+   81| 	"@PICKUP_SELF", // picked up from here
+   82| 	"@PICKUP_STACK",	// was picked up from a stack
+   83| 	"@PreSpawn",
+   84|     "@Redeed",
+   85|     "@RegionEnter",
+   86|     "@RegionLeave",
+   87|     "@ResourceGather",
+   88|     "@ResourceTest",
+   89| 	"@SELL",
+   90| 	"@Ship_Move",
+   91| 	"@Ship_Stop",
+   92| 	"@Ship_Turn",
+   93| 	"@Smelt",			// I am going to be smelted.
+   94| 	"@Spawn",
+   95| 	"@SpellEffect",		// cast some spell on me.
+   96| 	"@Start",
+   97| 	"@STEP",			// I have been walked on.
+   98|     "@Stop",
+   99| 	"@TARGON_CANCEL",
+  100| 	"@TARGON_CHAR",
+  101| 	"@TARGON_GROUND",
+  102| 	"@TARGON_ITEM",	// I am being combined with an item
+
+// ----- lines 340-361 -----
+  340| 			break;
+  341| 		case IT_GAME_BOARD:
+  342| 		case IT_BBOARD:
+  343| 		case IT_TRASH_CAN:
+  344| 		case IT_CONTAINER_LOCKED:
+  345| 		case IT_CONTAINER:
+  346| 		case IT_EQ_TRADE_WINDOW:
+  347| 		case IT_EQ_VENDOR_BOX:
+  348| 		case IT_EQ_BANK_BOX:
+  349| 		case IT_KEYRING:
+  350| 		case IT_SHIP_HOLD_LOCK:
+  351| 		case IT_SHIP_HOLD:
+  352| 			pItem = new CItemContainer( id, pItemDef );
+  353| 			break;
+  354| 		case IT_CORPSE:
+  355| 			pItem = new CItemCorpse( id, pItemDef );
+  356| 			break;
+  357| 		case IT_MESSAGE:
+  358| 		case IT_BOOK:
+  359| 			// A message for a bboard or book text.
+  360| 			pItem = new CItemMessage( id, pItemDef );
+  361| 			break;
+
+// ----- lines 363-384 -----
+  363| 		case IT_STONE_TOWN:
+  364| 			pItem = new CItemStone( id, pItemDef );
+  365| 			break;
+  366| 		case IT_MULTI:
+  367|         case IT_MULTI_ADDON:
+  368| 			pItem = new CItemMulti( id, pItemDef );
+  369| 			break;
+  370| 		case IT_MULTI_CUSTOM:
+  371| 			pItem = new CItemMultiCustom( id, pItemDef );
+  372| 			break;
+  373| 		case IT_SHIP:
+  374| 			pItem = new CItemShip( id, pItemDef );
+  375| 			break;
+  376| 		case IT_EQ_MEMORY_OBJ:
+  377| 			pItem = new CItemMemory( id, pItemDef );
+  378| 			break;
+  379| 		case IT_EQ_SCRIPT:	// pure script.with TAG(s) support
+  380| 		case IT_SCRIPT:
+  381| 			pItem = new CItemScript( id, pItemDef );
+  382| 			break;
+  383| 		default:
+  384|         {
+
+// ----- lines 1127-1147 -----
+ 1127|             CCSpawn *pSpawn = GetSpawn();
+ 1128|             if (pSpawn)
+ 1129|             {
+ 1130|                 pSpawn->FixDef();
+ 1131|                 pSpawn->SetTrackID();
+ 1132|             }
+ 1133|         }
+ 1134|         break;
+ 1135| 
+ 1136|         case IT_CONTAINER_LOCKED:
+ 1137|         case IT_SHIP_HOLD_LOCK:
+ 1138|         case IT_DOOR_LOCKED:
+ 1139|             // Doors and containers must have a lock complexity set.
+ 1140|             if (!m_itContainer.m_dwLockComplexity)
+ 1141|             {
+ 1142|                 m_itContainer.m_dwLockComplexity = 500 + g_Rand.GetVal(600);
+ 1143|             }
+ 1144|             break;
+ 1145| 
+ 1146|         case IT_POTION:
+ 1147|             if (m_itPotion.m_dwSkillQuality == 0) // store bought ?
+
+// ----- lines 1440-1460 -----
+ 1440| 		case IT_CROPS:		// crops "decay" as they grow
+ 1441|         {
+ 1442|             if (m_itCrop.m_Respawn_Sec > 0) // MORE1 override
+ 1443|                 return (m_itCrop.m_Respawn_Sec * MSECS_PER_SEC);
+ 1444| 
+ 1445|             const int64 iTimeNextNewMoon = CWorldGameTime::GetNextNewMoon((GetTopPoint().m_map == 1) ? false : true);
+ 1446|             const int64 iMinutesDelay = g_Rand.GetLLVal(20) * g_Cfg.m_iGameMinuteLength;
+ 1447| 			return (iTimeNextNewMoon - CWorldGameTime::GetCurrentTime().GetTimeRaw() + iMinutesDelay);
+ 1448|         }
+ 1449| 		case IT_MULTI:
+ 1450| 		case IT_SHIP:
+ 1451| 		case IT_MULTI_CUSTOM:
+ 1452| 			return ( 14 * 24 * 60 * 60 * MSECS_PER_SEC );		// very long decay updated as people use it
+ 1453| 		case IT_TRASH_CAN:
+ 1454| 			return ( 3 * 60 * MSECS_PER_SEC );		// empties in 3 minutes
+ 1455| 		default:
+ 1456| 			break;
+ 1457| 	}
+ 1458| 
+ 1459| 	if (IsAttr(ATTR_MOVE_NEVER|ATTR_STATIC|ATTR_LOCKEDDOWN|ATTR_SECURE) || !IsMovableType())
+ 1460| 		return -1;
+
+// ----- lines 2152-2181 -----
+ 2152| 	}
+ 2153| 	// SetBase sets the type, but only SetType does the components check
+ 2154| 	SetBase(pItemDef);
+ 2155|     SetType(pItemDef->GetType());
+ 2156| 	return true;
+ 2157| }
+ 2158| 
+ 2159| void CItem::OnHear( lpctstr pszCmd, CChar * pSrc )
+ 2160| {
+ 2161|     ADDTOCALLSTACK("CItem::OnHear");
+ 2162| 	// This should never be called directly. Normal items cannot hear. IT_SHIP and IT_COMM_CRYSTAL
+ 2163| 	UnreferencedParameter(pszCmd);
+ 2164| 	UnreferencedParameter(pSrc);
+ 2165| 	ASSERT(false);
+ 2166| }
+ 2167| 
+ 2168| bool CItem::CanHear() const noexcept
+ 2169| {
+ 2170|     //ADDTOCALLSTACK("CItem::CanHear");
+ 2171|     return IsType(IT_SHIP) || IsType(IT_COMM_CRYSTAL);
+ 2172| }
+ 2173| 
+ 2174| CItemBase * CItem::Item_GetDef() const noexcept
+ 2175| {
+ 2176| 	return static_cast <CItemBase*>( Base_GetDef() );
+ 2177| }
+ 2178| 
+ 2179| ITEMID_TYPE CItem::GetID() const
+ 2180| {
+ 2181| 	const CItemBase * pItemDef = Item_GetDef();
+
+// ----- lines 3056-3076 -----
+ 3056|     case IT_TRAP_INACTIVE:
+ 3057|     case IT_ANIM_ACTIVE:
+ 3058|     case IT_SWITCH:
+ 3059|     case IT_DEED:
+ 3060|     case IT_LOOM:
+ 3061|     case IT_ARCHERY_BUTTE:
+ 3062|     case IT_ITEM_STONE:
+ 3063|         m_itNormal.m_more1 = CResourceIDBase(RES_ITEMDEF, iIndex);
+ 3064|         return;
+ 3065| 
+ 3066|     //case: IT_SHIP_TILLER
+ 3067|     //case: IT_KEY
+ 3068|     //case: IT_SIGN_GUMP
+ 3069|         // Allow arbitrary values, not necessarily valid UIDs (for backwards compatibility)
+ 3070| 
+ 3071|     case IT_SPAWN_CHAR:
+ 3072|     case IT_SPAWN_ITEM:
+ 3073|     case IT_SPAWN_CHAMPION:
+ 3074|         if (!g_Serv.IsLoadingGeneric())
+ 3075|         {
+ 3076|             CCSpawn* pSpawn = GetSpawn();
+
+// ----- lines 4309-4347 -----
+ 4309| bool CItem::IsTypeArmorWeapon() const
+ 4310| {
+ 4311| 	// Armor or weapon.
+ 4312| 	return ( IsTypeArmor() || IsTypeWeapon());
+ 4313| }
+ 4314| 
+ 4315| bool CItem::IsTypeLocked() const
+ 4316| {
+ 4317| 	switch ( m_type )
+ 4318| 	{
+ 4319| 		case IT_SHIP_SIDE_LOCKED:
+ 4320| 		case IT_CONTAINER_LOCKED:
+ 4321| 		case IT_SHIP_HOLD_LOCK:
+ 4322| 		case IT_DOOR_LOCKED:
+ 4323| 			return true;
+ 4324| 		default:
+ 4325| 			return false;
+ 4326| 	}
+ 4327| }
+ 4328| bool CItem::IsTypeLockable() const
+ 4329| {
+ 4330| 	switch( m_type )
+ 4331| 	{
+ 4332| 		case IT_CONTAINER:
+ 4333| 		case IT_DOOR:
+ 4334| 		case IT_DOOR_OPEN:
+ 4335| 		case IT_SHIP_SIDE:
+ 4336| 		case IT_SHIP_PLANK:
+ 4337| 		case IT_SHIP_HOLD:
+ 4338| 			//case IT_ROPE:
+ 4339| 			return true;
+ 4340| 		default:
+ 4341| 			return( IsTypeLocked() );
+ 4342| 	}
+ 4343| }
+ 4344| bool CItem::IsTypeSpellable() const
+ 4345| {
+ 4346| 	// m_itSpell
+ 4347| 	switch( m_type )
+
+// ----- lines 5495-5515 -----
+ 5495| 		// Skip items linked to a ship or multi
+ 5496| 		if ( pItem->m_uidLink.IsValidUID() )
+ 5497| 		{
+ 5498| 			CItem * pItemLink = pItem->m_uidLink.ItemFind();
+ 5499| 			if (( pItemLink ) && ( pItemLink->IsTypeMulti() ))
+ 5500| 					continue;
+ 5501| 		}
+ 5502| 
+ 5503| 		// Track boats separately from other items
+ 5504| 		if ( iDist <= g_Cfg.m_iMapViewRadar && // if it's visible in the radar window as a boat, report it
+ 5505| 			pItem->m_type == IT_SHIP )
+ 5506| 		{
+ 5507| 			++iBoatSighted; // Keep a tally of how many we see
+ 5508| 			if (!pBoatSighted || iDist < ptCoords.GetDist(pBoatSighted->GetTopPoint())) // Only find closer items to us
+ 5509| 			{
+ 5510| 				pBoatSighted = pItem;
+ 5511| 			}
+ 5512| 		}
+ 5513| 		else
+ 5514| 		{
+ 5515| 			++ iItemSighted; // Keep a tally of how much we see
+
+// ----- lines 5821-5854 -----
+ 5821| 			{
+ 5822| 				SetType(IT_DOOR_LOCKED);
+ 5823| 				pCharSrc->SysMessage( g_Cfg.GetDefaultMsg( DEFMSG_LOCK_DOOR_OK ) );
+ 5824| 			}
+ 5825| 			else
+ 5826| 			{
+ 5827| 				pCharSrc->SysMessage( g_Cfg.GetDefaultMsg( DEFMSG_LOCK_DOOR_NO_KEY ) );
+ 5828| 				return false;
+ 5829| 			}
+ 5830| 			break;
+ 5831| 		case IT_SHIP_HOLD:
+ 5832| 			if ( pCharSrc->ContentFindKeyFor( this ))
+ 5833| 			{
+ 5834| 				SetType(IT_SHIP_HOLD_LOCK);
+ 5835| 				pCharSrc->SysMessage( g_Cfg.GetDefaultMsg( DEFMSG_LOCK_HOLD_OK ) );
+ 5836| 			}
+ 5837| 			else
+ 5838| 			{
+ 5839| 				pCharSrc->SysMessage( g_Cfg.GetDefaultMsg( DEFMSG_LOCK_HOLD_NO_KEY ) );
+ 5840| 				return false;
+ 5841| 			}
+ 5842| 			break;
+ 5843| 		case IT_SHIP_SIDE:
+ 5844| 			SetType(IT_SHIP_SIDE_LOCKED);
+ 5845| 			pCharSrc->SysMessage( g_Cfg.GetDefaultMsg( DEFMSG_LOCK_SHIP_OK ) );
+ 5846| 			break;
+ 5847| 		default:
+ 5848| 			pCharSrc->SysMessage( g_Cfg.GetDefaultMsg( DEFMSG_LOCK_CAN_NOT ) );
+ 5849| 			return false;
+ 5850| 	}
+ 5851| 
+ 5852| 	return true;
+ 5853| }
+ 5854| 
+
+// ----- lines 6556-6579 -----
+ 6556| 				else
+ 6557| 				{
+ 6558| 					// Burn out the light
+ 6559| 					Emote(g_Cfg.GetDefaultMsg(DEFMSG_LIGHTSRC_BURN_OUT));
+ 6560| 					m_itLight.m_burned = 1;
+ 6561| 					Use_Light();
+ 6562| 				}
+ 6563| 			}
+ 6564| 			return true;
+ 6565| 
+ 6566| 		case IT_SHIP_PLANK:
+ 6567| 			{
+ 6568| 				EXC_SET_BLOCK("default behaviour::IT_SHIP_PLANK");
+ 6569| 				Ship_Plank( false );
+ 6570| 			}
+ 6571| 			return true;
+ 6572| 
+ 6573| 		case IT_EXPLOSION:
+ 6574| 			{
+ 6575| 				EXC_SET_BLOCK("default behaviour::IT_EXPLOSION");
+ 6576| 				OnExplosion();
+ 6577| 			}
+ 6578| 			break;
+ 6579| 

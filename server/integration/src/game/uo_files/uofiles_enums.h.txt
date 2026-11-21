@@ -1,0 +1,36 @@
+// Excerpt of MyShard-Server/src/game/uo_files/uofiles_enums.h
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 3-34 -----
+    3| *
+    4| */
+    5| 
+    6| #ifndef _INC_UOFILES_ENUMS_H
+    7| #define _INC_UOFILES_ENUMS_H
+    8| 
+    9| /*
+   10| * @brief Movement type for ships
+   11| * From packet 0xBF.0x32: 0 = Stop Movement, 1 = One Tile Movement, 2 = Normal Movement
+   12| */
+   13| enum ShipMovementType : int
+   14| {
+   15|     SMT_STOP,   // No movement
+   16|     SMT_SLOW,   // 1 tile movement
+   17|     SMT_NORMAL  // normal movement
+   18| };
+   19| 
+   20| /*
+   21| * @Speed type for ships
+   22| * this has to sync with the outgoing 0xF6 packet
+   23| */
+   24| enum ShipMovementSpeed : int
+   25| {
+   26|     SMS_STOP,    // 0x0 = no movement
+   27|     SMS_NORMAL,  // 0x01 = one tile
+   28|     SMS_ROWBOAT, // 0x02 = rowboat
+   29|     SMS_SLOW,    // 0x03 = slow
+   30|     SMS_FAST     // 0x04 = fast
+   31| };
+   32| 
+   33| // 20 colors of 10 hues and 5 brightnesses, which gives us 1000 colors.
+   34| //  plus black, and default.

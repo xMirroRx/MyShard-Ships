@@ -1,0 +1,25 @@
+// Excerpt of MyShard-Client/src/ClassicUO.Client/Game/Scenes/GameScene.cs
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 961-981 -----
+  961|             if (currentProfile.ForceResyncOnHang && Time.Ticks - AsyncNetClient.Socket.Statistics.LastPingReceived > 5000 && Time.Ticks - _lastResync > 5000)
+  962|             {
+  963|                 //Last ping > ~5 seconds
+  964|                 AsyncNetClient.Socket.Send_Resync();
+  965|                 _lastResync = Time.Ticks;
+  966|                 GameActions.Print(_world, "Possible connection hang, resync attempted", 32, MessageType.System);
+  967|             }
+  968| 
+  969|             _world.Update();
+  970|             _animatedStaticsManager.Process();
+  971|             _world.BoatMovingManager.Update();
+  972|             _world.Player.Pathfinder.ProcessAutoWalk();
+  973|             _world.DelayedObjectClickManager.Update();
+  974| 
+  975| 
+  976|             if (
+  977|                 (currentProfile.CorpseOpenOptions == 1 || currentProfile.CorpseOpenOptions == 3)
+  978|                     && _world.TargetManager.IsTargeting
+  979|                 || (currentProfile.CorpseOpenOptions == 2 || currentProfile.CorpseOpenOptions == 3)
+  980|                     && _world.Player.IsHidden
+  981|             )

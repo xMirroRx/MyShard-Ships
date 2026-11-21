@@ -1,0 +1,31 @@
+// Excerpt of MyShard-Client/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedPacketTypeEnum.cs
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 29-55 -----
+   29|     TradeRequest,     // player-trade request (party-invite style): server -> target popup / client -> server ask
+   30|     TradeAccept,      // target accepted a trade request -> server opens the real secure trade (0x6F) on both
+   31|     TradeDecline,     // target declined (or server auto-cancelled) a trade request -> requester notified
+   32|     WhisperSend,      // client -> server: private (WoW-style) whisper to a named player
+   33|     WhisperReceive,   // server -> client: a private whisper delivered (direction + other party's name + text)
+   34|     PortraitPlaytime,        // server -> client: account total online minutes (profile portraits unlock by playtime)
+   35|     PortraitPlaytimeRequest, // client -> server: ask the server for my account's total online time
+   36|     GmAnnounce,              // server -> all clients: a GM ".duyuru" broadcast -> big centered text over each player's own head
+   37|     StorePortrait,           // client -> server -> all: a player's Store portrait (sp#) + frame (pi#) so others see it on the target HUD
+   38|     WeaponGlow,              // client -> server -> all: bitmask of a player's active Store weapon-glow types -> others see the glow on that weapon
+   39|     ShipGlow,               // client -> server: bitmask of a player's applied Store ship-glow types (server decides on piloting)
+   40|     ShipGlowState,          // server -> all: a ship (serial) glow on/off -> everyone sees the whole ship glow while it's piloted
+   41|     StorePurchase,          // client -> server: a Store purchase (item id/name/price) -> server records it on the ACCOUNT (sync) + logs
+   42|     StoreOwnedRequest,      // client -> server: send me my account's owned Store items (sync on Store open / world enter)
+   43|     StoreOwnedList,         // server -> client: the account's owned Store item ids (comma-separated) -> merged into the profile
+   44|     ShipDye,                // client -> server: a player's applied Store ship-dye HUE (0 = none; server decides on piloting)
+   45|     ShipDyeState,           // server -> all: a ship part (serial) dye hue -> everyone sees the whole ship recoloured while piloted
+   46|     MountDye,               // client -> server: a player's applied Store mount-dye HUE (0 = none) -> relayed to everyone
+   47|     MountDyeState,          // server -> all: a rider (serial) mount-dye hue -> everyone sees that player's mount recoloured
+   48|     DuelRequest,            // 43 client -> server: challenge a target (serial) to a 1v1 duel
+   49|     DuelAccept,             // 44 client -> server: accept requester's duel request
+   50|     DuelDecline,            // 45 client -> server: decline requester's duel request
+   51|     DuelPrompt,             // 46 server -> target: a player wants to duel you -> Accept/Decline popup
+   52|     DuelState,              // 47 server -> all: duel start/end (serialA, serialB, state) -> duello HP bar + start countdown
+   53|     JumpFx,                 // 48 server -> nearby: render a mobile moving between two tiles along an airborne arc
+   54|     AttackTiming,           // 49 server -> nearby: exact attack wind-up/recovery timing in milliseconds
+   55|     GatherNodeLevel,        // 50 server -> client: gather node serial + TAG.Level (1-5) -> level dots under the node

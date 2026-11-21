@@ -1,0 +1,253 @@
+From 8ec1a04ab9b932a907dd7a5ddea3cc1cc0cb0558 Mon Sep 17 00:00:00 2001
+From: xMirroRx <xMirroRx@users.noreply.github.com>
+Date: Sun, 12 Jul 2026 01:19:28 +0300
+Subject: [PATCH] MyShard Ship Dye + Mount Dye: pilotta gemi / binekte mount
+ hue boyama
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- Ship Dye: CCMultiMovable::SetPilot pilota geçince ship + tüm _lComps parçalarını oyuncunun SHIPDYE hue'suyla
+  broadcast eder (her gemi, tip gating yok), pilottan çıkınca temizler; CClientMsg addItem_OnGround SHIPDYEON
+  view-entry resync. PacketShipDyeState (type 40), receive type 39 -> SHIPDYE keynum.
+- Mount Dye: receive type 41 -> MOUNTDYE keynum + herkese relay (PacketMountDyeState type 42); CClientMsg
+  char-enter MOUNTDYE re-send (görüşe giren/relog eden oyuncular da doğru renkte görür).
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+---
+ src/game/clients/CClientMsg.cpp        | 13 ++++++++
+ src/game/components/CCMultiMovable.cpp | 46 ++++++++++++++++++++++++++
+ src/network/receive.cpp                | 20 +++++++++++
+ src/network/send.cpp                   | 42 +++++++++++++++++++++++
+ src/network/send.h                     | 29 ++++++++++++++++
+ 5 files changed, 150 insertions(+)
+
+diff --git a/src/game/clients/CClientMsg.cpp b/src/game/clients/CClientMsg.cpp
+index 8a426695..99b6332a 100644
+--- a/src/game/clients/CClientMsg.cpp
++++ b/src/game/clients/CClientMsg.cpp
+@@ -413,6 +413,14 @@ void CClient::addItem_OnGround( CItem * pItem ) // Send items (on ground)
+ 	{
+ 		new PacketShipGlowState(this, (dword)pItem->GetUID(), 1);
+ 	}
++
++	// MyShard: same for the whole-ship DYE — a player walking INTO view of a dyed ship part gets it re-sent so they
++	// see the same recoloured ship as everyone else. SHIPDYEON stores the hue (set by the pilot; cleared on helm off).
++	word wShipDye = (word)pItem->GetKeyNum("SHIPDYEON");
++	if ( wShipDye != 0 )
++	{
++		new PacketShipDyeState(this, (dword)pItem->GetUID(), wShipDye);
++	}
+ }
+ 
+ void CClient::addItem_Equipped( const CItem * pItem )
+@@ -1243,6 +1251,11 @@ void CClient::addChar( CChar * pChar, bool fFull )
+ 			}
+ 		}
+ 
++		// MyShard: re-send this char's Store MOUNT DYE hue so a player entering view (or on relog) sees the same
++		// recoloured mount as everyone else. MOUNTDYE keynum holds the hue (set/relayed when the owner applies it).
++		if ( pChar->GetKeyNum("MOUNTDYE") != 0 )
++			new PacketMountDyeState(this, pChar->GetUID(), (word)pChar->GetKeyNum("MOUNTDYE"));
++
+ 		// MyShard: re-send the char's PERSISTENT looping effects (EFFECTSTAY, stored in CHARFX.* tags) — so a
+ 		// player who sees this char later (enter view, relog) gets the same aura as everyone else.
+ 		for ( size_t i = 0, n = pChar->m_TagDefs.GetCount(); i < n; ++i )
+diff --git a/src/game/components/CCMultiMovable.cpp b/src/game/components/CCMultiMovable.cpp
+index 1548d5d9..489cb703 100644
+--- a/src/game/components/CCMultiMovable.cpp
++++ b/src/game/components/CCMultiMovable.cpp
+@@ -235,6 +235,18 @@ static void MyShard_BroadcastShipGlow(dword dwShipSerial, byte on)
+ 	}
+ }
+ 
++// MyShard: tell every online client to recolour (hue) / clear (0) a ship part, by its serial.
++static void MyShard_BroadcastShipDye(dword dwShipSerial, word wHue)
++{
++	ClientIterator it;
++	for (CClient *pTo = it.next(); pTo != nullptr; pTo = it.next())
++	{
++		if (pTo->GetChar() == nullptr)
++			continue;
++		new PacketShipDyeState(pTo, dwShipSerial, wHue);
++	}
++}
++
+ 
+ void CCMultiMovable::SetPilot(CChar *pChar)
+ {
+@@ -273,6 +285,21 @@ void CCMultiMovable::SetPilot(CChar *pChar)
+ 				}
+ 			}
+ 		}
++		// MyShard: also clear the whole-ship DYE when leaving the helm (ship tile + every component).
++		pItemThis->SetKeyNum("SHIPDYEON", 0);
++		MyShard_BroadcastShipDye(pItemThis->GetUID(), 0);
++		{
++			CItemMulti *pMultiDye = static_cast<CItemMulti*>(pItemThis);
++			for (size_t i = 0; i < pMultiDye->_lComps.size(); ++i)
++			{
++				CItem *pComp = pMultiDye->_lComps[i].ItemFind();
++				if (pComp != nullptr)
++				{
++					pComp->SetKeyNum("SHIPDYEON", 0);
++					MyShard_BroadcastShipDye(pComp->GetUID(), 0);
++				}
++			}
++		}
+ 		return;
+ 	}
+ 
+@@ -331,6 +358,25 @@ void CCMultiMovable::SetPilot(CChar *pChar)
+ 				}
+ 			}
+ 		}
++
++		// MyShard: if this pilot applied a Store ship DYE, recolour the WHOLE ship (ANY ship type) to that hue for
++		// everyone. Tag ship + components with SHIPDYEON (the hue) so players entering view later get it re-sent.
++		word wDye = (word)pChar->GetKeyNum("SHIPDYE");
++		if (wDye != 0)
++		{
++			pItemThis->SetKeyNum("SHIPDYEON", wDye);
++			MyShard_BroadcastShipDye(pItemThis->GetUID(), wDye);
++			CItemMulti *pMultiDye = static_cast<CItemMulti*>(pItemThis);
++			for (size_t i = 0; i < pMultiDye->_lComps.size(); ++i)
++			{
++				CItem *pComp = pMultiDye->_lComps[i].ItemFind();
++				if (pComp != nullptr)
++				{
++					pComp->SetKeyNum("SHIPDYEON", wDye);
++					MyShard_BroadcastShipDye(pComp->GetUID(), wDye);
++				}
++			}
++		}
+ 	}
+ }
+ 
+diff --git a/src/network/receive.cpp b/src/network/receive.cpp
+index c7007bdb..0c2a1c89 100644
+--- a/src/network/receive.cpp
++++ b/src/network/receive.cpp
+@@ -3817,6 +3817,26 @@ bool PacketEnhanced::onReceive(CNetState* net)
+ 		word wMask = readInt16();
+ 		pChar->SetKeyNum("SHIPGLOW", wMask);
+ 	}
++	else if (type == 39)				// ShipDye — store the player's applied ship-dye HUE (used on piloting; 0 = none)
++	{
++		word wHue = readInt16();
++		pChar->SetKeyNum("SHIPDYE", wHue);
++	}
++	else if (type == 41)				// MountDye — store the player's mount-dye HUE + relay to EVERYONE (their mount recolours)
++	{
++		word wHue = readInt16();
++		pChar->SetKeyNum("MOUNTDYE", wHue);   // stored so it re-sends when a player enters view (addChar)
++
++		dword dwSerial = pChar->GetUID();
++		ClientIterator it;
++		for (CClient* pTo = it.next(); pTo != nullptr; pTo = it.next())
++		{
++			if (pTo->GetChar() == nullptr)
++				continue;
++
++			new PacketMountDyeState(pTo, dwSerial, wHue);
++		}
++	}
+ 	else if (type == 36)				// StorePurchase — record the item on the ACCOUNT (persisted, cross-machine sync)
+ 	{
+ 		char szId[128];
+diff --git a/src/network/send.cpp b/src/network/send.cpp
+index 640fb840..b1e5c6ce 100644
+--- a/src/network/send.cpp
++++ b/src/network/send.cpp
+@@ -4321,6 +4321,48 @@ PacketShipGlowState::PacketShipGlowState(const CClient* target, dword shipSerial
+ 	push(target);
+ }
+ 
++/***************************************************************************
++ *
++ *
++ *	Packet 0xCE : PacketShipDyeState	(custom) MyShard: recolour a ship part (serial) to a UO hue for everyone.
++ *
++ *
++ ***************************************************************************/
++PacketShipDyeState::PacketShipDyeState(const CClient* target, dword shipSerial, word hue)
++	: PacketSend(0xCE, 0, PRI_NORMAL)
++{
++	ADDTOCALLSTACK("PacketShipDyeState::PacketShipDyeState");
++
++	initLength();			// 2-byte length, finalized on send
++	writeInt16(40);			// EnhancedPacketType.ShipDyeState
++	writeInt16(0);			// version
++	writeInt32(shipSerial);	// the ship part (multi tile / component item) to recolour
++	writeInt16(hue);		// UO hue (0 = clear the dye)
++
++	push(target);
++}
++
++/***************************************************************************
++ *
++ *
++ *	Packet 0xCE : PacketMountDyeState	(custom) MyShard: recolour a rider's mount to a UO hue for everyone.
++ *
++ *
++ ***************************************************************************/
++PacketMountDyeState::PacketMountDyeState(const CClient* target, dword riderSerial, word hue)
++	: PacketSend(0xCE, 0, PRI_NORMAL)
++{
++	ADDTOCALLSTACK("PacketMountDyeState::PacketMountDyeState");
++
++	initLength();			// 2-byte length, finalized on send
++	writeInt16(42);			// EnhancedPacketType.MountDyeState
++	writeInt16(0);			// version
++	writeInt32(riderSerial);// the rider whose mount should be recoloured
++	writeInt16(hue);		// UO hue (0 = clear the dye)
++
++	push(target);
++}
++
+ /***************************************************************************
+  *
+  *
+diff --git a/src/network/send.h b/src/network/send.h
+index 748f4bbf..6dda4d94 100644
+--- a/src/network/send.h
++++ b/src/network/send.h
+@@ -1680,6 +1680,35 @@ public:
+ 	PacketShipGlowState(const CClient* target, dword shipSerial, byte on);
+ };
+ 
++/***************************************************************************
++ *
++ *
++ *	Packet 0xCE : PacketShipDyeState	(custom) MyShard: a ship part (serial) dye HUE, sent to every online
++ *										player so the whole ship recolours while its pilot (who applied the dye)
++ *										has the helm. hue 0 = clear the dye.
++ *
++ *
++ ***************************************************************************/
++class PacketShipDyeState : public PacketSend
++{
++public:
++	PacketShipDyeState(const CClient* target, dword shipSerial, word hue);
++};
++
++/***************************************************************************
++ *
++ *
++ *	Packet 0xCE : PacketMountDyeState	(custom) MyShard: a rider (serial) mount-dye HUE, sent to every online
++ *										player so that player's mount recolours for everyone. hue 0 = clear.
++ *
++ *
++ ***************************************************************************/
++class PacketMountDyeState : public PacketSend
++{
++public:
++	PacketMountDyeState(const CClient* target, dword riderSerial, word hue);
++};
++
+ /***************************************************************************
+  *
+  *
+-- 
+2.54.0.windows.1
+

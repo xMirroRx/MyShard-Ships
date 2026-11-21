@@ -1,0 +1,141 @@
+From 7d95d91cdc42a60e6280874d05fa8b57c62b90a1 Mon Sep 17 00:00:00 2001
+From: xMirroRx <xMirroRx@users.noreply.github.com>
+Date: Wed, 30 Sep 2026 09:18:52 +0300
+Subject: [PATCH] Ship region follows the hull, not its bounding box
+
+- CItemMulti::Multi_IsOnFootprint checks the multi layout for a tile at a point
+- Sector region lookup skips a ship's empty bounding-box corners
+- Realizing a ship region only pulls in chars standing on the hull
+- Ship movement only carries chars/items on the hull
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/game/CSectorBase.cpp               |  6 +++++-
+ src/game/components/CCMultiMovable.cpp |  4 ++--
+ src/game/items/CItemMulti.cpp          | 29 ++++++++++++++++++++++++++
+ src/game/items/CItemMulti.h            |  7 +++++++
+ 4 files changed, 43 insertions(+), 3 deletions(-)
+
+diff --git a/src/game/CSectorBase.cpp b/src/game/CSectorBase.cpp
+index 60bbf618..b0d2cec5 100644
+--- a/src/game/CSectorBase.cpp
++++ b/src/game/CSectorBase.cpp
+@@ -309,9 +309,10 @@ CRegion * CSectorBase::GetRegion( const CPointBase & pt, dword dwType ) const
+ 
+         const CResourceID& ridRegion = pRegion->GetResourceID();
+ 		ASSERT( ridRegion.IsValidUID());
++		const CItemShip * pShipItem = nullptr;
+ 		if ( ridRegion.IsUIDItem())
+ 		{
+-			const CItemShip * pShipItem = dynamic_cast <CItemShip *>(ridRegion.ItemFindFromResource());
++			pShipItem = dynamic_cast <CItemShip *>(ridRegion.ItemFindFromResource());
+ 			if (pShipItem)
+ 			{
+ 				if (!(dwType & REGION_TYPE_SHIP))
+@@ -335,6 +336,9 @@ CRegion * CSectorBase::GetRegion( const CPointBase & pt, dword dwType ) const
+ 			continue;
+ 		if ( ! pRegion->IsInside2d( pt ))
+ 			continue;
++		// MyShard: empty corners of a ship's bounding box belong to the region below.
++		if ( pShipItem && ! pShipItem->Multi_IsOnFootprint( pt ))
++			continue;
+ 		return pRegion;
+ 	}
+ 	return nullptr;
+diff --git a/src/game/components/CCMultiMovable.cpp b/src/game/components/CCMultiMovable.cpp
+index 489cb703..34a43bef 100644
+--- a/src/game/components/CCMultiMovable.cpp
++++ b/src/game/components/CCMultiMovable.cpp
+@@ -168,7 +168,7 @@ uint CCMultiMovable::ListObjs(CObjBase ** ppObjList)
+         CChar *pChar = Area->GetChar();
+         if (pChar == nullptr)
+             break;
+-        if (!pMulti->GetRegion()->IsInside2d(pChar->GetTopPoint()))
++        if (!pMulti->GetRegion()->IsInside2d(pChar->GetTopPoint()) || !pMulti->Multi_IsOnFootprint(pChar->GetTopPoint()))
+             continue;
+         if (pChar->IsDisconnected() && pChar->m_pNPC)
+             continue;
+@@ -193,7 +193,7 @@ uint CCMultiMovable::ListObjs(CObjBase ** ppObjList)
+         if (pMulti->Multi_IsPartOf(pItem)) // already listed.
+             continue;
+ 
+-        if (!pMulti->GetRegion()->IsInside2d(pItem->GetTopPoint()))
++        if (!pMulti->GetRegion()->IsInside2d(pItem->GetTopPoint()) || !pMulti->Multi_IsOnFootprint(pItem->GetTopPoint()))
+             continue;
+ 
+         //I guess we can allow items to be locked on the ships and still move... but disallow attr_static from moving
+diff --git a/src/game/items/CItemMulti.cpp b/src/game/items/CItemMulti.cpp
+index 43235c1d..d341856b 100644
+--- a/src/game/items/CItemMulti.cpp
++++ b/src/game/items/CItemMulti.cpp
+@@ -4,6 +4,7 @@
+ //#include "../../common/CExpression.h" // included in the precompiled header
+ //#include "../../common/CScriptParserBufs.h" // included in the precompiled header via CExpression.h
+ #include "../../common/sphereproto.h"
++#include "../uo_files/CUOMultiItemRec.h"
+ #include "../chars/CChar.h"
+ #include "../clients/CClient.h"
+ #include "../items/CItemStone.h"
+@@ -265,6 +266,12 @@ bool CItemMulti::MultiRealizeRegion()
+         {
+             continue;
+         }
++        // MyShard: the search is a square of the multi's largest side; only chars really standing on the multi
++        // belong to it (a player next to a freshly placed ship stayed in the ship's region until he walked).
++        if (!m_pRegion->IsInside2d(pChar->GetTopPoint()) || (IsType(IT_SHIP) && !Multi_IsOnFootprint(pChar->GetTopPoint())))
++        {
++            continue;
++        }
+         pChar->MoveToRegion(m_pRegion, false); //Move the character to house region.
+     }
+ 
+@@ -424,6 +431,28 @@ void CItemMulti::Multi_Setup(CChar *pChar, dword dwKeyCode)
+     pChar->r_Call("f_multi_setup", CScriptParserBufs::GetCScriptTriggerArgsPtr(), pChar, nullptr, nullptr);
+ }
+ 
++bool CItemMulti::Multi_IsOnFootprint(const CPointBase & pt) const
++{
++    ADDTOCALLSTACK("CItemMulti::Multi_IsOnFootprint");
++    // MyShard: a ship's MULTIREGION is its bounding box, but the hull tapers at bow and stern.
++    // Without this, someone standing on the shore next to a beached ship was "inside" it.
++    const CUOMulti *pMultiDef = g_Cfg.GetMultiItemDefs(const_cast<CItemMulti *>(this));
++    if (!pMultiDef || pMultiDef->GetItemCount() == 0)
++        return true;    // no layout data: keep the rectangle behaviour
++
++    const CPointMap& ptTop = GetTopPoint();
++    const int dx = pt.m_x - ptTop.m_x;
++    const int dy = pt.m_y - ptTop.m_y;
++    const size_t uiQty = pMultiDef->GetItemCount();
++    for (size_t i = 0; i < uiQty; ++i)
++    {
++        const CUOMultiItemRec_HS *pRec = pMultiDef->GetItem(i);
++        if (pRec && pRec->m_dx == dx && pRec->m_dy == dy)
++            return true;
++    }
++    return false;
++}
++
+ bool CItemMulti::Multi_IsPartOf(const CItem * pItem) const
+ {
+     ADDTOCALLSTACK("CItemMulti::Multi_IsPartOf");
+diff --git a/src/game/items/CItemMulti.h b/src/game/items/CItemMulti.h
+index 41695861..f24a7267 100644
+--- a/src/game/items/CItemMulti.h
++++ b/src/game/items/CItemMulti.h
+@@ -137,6 +137,13 @@ public:
+     */
+     int Multi_GetDistanceMax() const;
+ 
++    /**
++    * @brief Checks if a multi tile stands on the given point (the region is a rectangle, the hull may not be).
++    * @param pt the world point to check
++    * @return true if a component of the multi's layout covers pt, or if the layout is unknown.
++    */
++    bool Multi_IsOnFootprint(const CPointBase & pt) const;
++
+     /**
+     * @brief Checks if a the multi can be created and create it if so.
+     *
+-- 
+2.54.0.windows.1
+

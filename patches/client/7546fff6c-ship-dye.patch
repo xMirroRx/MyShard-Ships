@@ -1,0 +1,1008 @@
+From 7546fff6cf254fbb212db73c3dbc8c30c25962e8 Mon Sep 17 00:00:00 2001
+From: xMirroRx <xMirroRx@users.noreply.github.com>
+Date: Sun, 12 Jul 2026 01:19:08 +0300
+Subject: [PATCH] =?UTF-8?q?Store:=20Premium/Silver/Gold=20sayfalar=C4=B1?=
+ =?UTF-8?q?=20+=20Ship=20Dye=20+=20Mount=20Dye=20(Server=20ile)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Store sayfaları:
+- Premium: 3 süre kartı (logo+gün+taş+fiyat), "Gold ile premium al" toggle (30 gün Kredi<->Gold), House
+  Decoration kategorisi kaldırıldı.
+- Silver: Kredi'yi TL ile alma (6 paket), Gold: Kredi'yi gp ile alma (3 paket) — kartlarda kategori logosu
+  (orijinal boyut + başlık tint'i).
+
+Ship Dye (Server + Client): pilota geçince tüm gemi (tiller/hatch/yelken/plank) UO hue'suna boyanır; broadcast +
+  view-entry resync. Hits/Mana barları (Hue!=0) hariç. Kartlarda item 15944 hue'lu önizleme.
+
+Mount Dye (Server + Client): binilen binek (yalnızca binek) oyuncunun hue'suna boyanır; oyuncu-başına broadcast +
+  char-enter resync. Kartlarda item 41565 hue'lu önizleme (yeni art override).
+
+Client: ShipDyeManager/MountDyeManager, MultiView/ItemView/MobileView hue override, EnhancedPacket ShipDye(39)/
+  ShipDyeState(40)/MountDye(41)/MountDyeState(42), Profile.StoreShipDyeHue/StoreMountDyeHue, PlayerHudGump push,
+  GlowToggleCard canlı isActive senkronu + item önizleme, ExternalImages/art/41565.png.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+---
+ src/ClassicUO.Client/Configuration/Profile.cs |   8 +
+ .../Game/GameObjects/Views/ItemView.cs        |  14 +
+ .../Game/GameObjects/Views/MobileView.cs      |  11 +-
+ .../Game/GameObjects/Views/MultiView.cs       |  14 +
+ .../Game/Managers/MountDyeManager.cs          |  30 +
+ .../Game/Managers/ShipDyeManager.cs           |  32 +
+ .../Game/UI/Gumps/PlayerHudGump.cs            |   5 +
+ .../Game/UI/Gumps/StoreGump.cs                | 588 +++++++++++++++++-
+ .../LegionScripting/docs/LegionAPI.md         |   2 +-
+ .../EnhancedOutgoingPackets.cs                |  28 +
+ .../EnhancedPackets/EnhancedPacketHandler.cs  |  25 +
+ .../EnhancedPackets/EnhancedPacketTypeEnum.cs |   6 +-
+ 12 files changed, 755 insertions(+), 8 deletions(-)
+ create mode 100644 src/ClassicUO.Client/Game/Managers/MountDyeManager.cs
+ create mode 100644 src/ClassicUO.Client/Game/Managers/ShipDyeManager.cs
+
+diff --git a/src/ClassicUO.Client/Configuration/Profile.cs b/src/ClassicUO.Client/Configuration/Profile.cs
+index 6f1c0048f..adf503154 100644
+--- a/src/ClassicUO.Client/Configuration/Profile.cs
++++ b/src/ClassicUO.Client/Configuration/Profile.cs
+@@ -329,6 +329,14 @@ namespace ClassicUO.Configuration
+         // itself only shows while piloting that ship (server-driven). See ShipGlowManager.Types for the bits.
+         public int StoreShipGlowMask { get; set => SetProperty(ref field, value); } = 0;
+ 
++        // MyShard Store ship-dye: the currently applied UO hue for whole-ship recolouring (0 = none). Persisted; the
++        // dye only shows while piloting (server-driven, per ship-part serial). Only one dye active at a time.
++        public int StoreShipDyeHue { get; set => SetProperty(ref field, value); } = 0;
++
++        // MyShard Store mount-dye: the currently applied UO hue for recolouring the ridden mount (0 = none). Persisted;
++        // broadcast to everyone so others see the dyed mount. Only one dye active at a time.
++        public int StoreMountDyeHue { get; set => SetProperty(ref field, value); } = 0;
++
+         // How many playtime-unlockable portraits the player has already acknowledged (opened the portrait
+         // window while they were unlocked). -1 = not seeded yet. Used to blink "NEW PORTRAIT" on the HUD
+         // when a fresh one unlocks. See PortraitUnlockManager.
+diff --git a/src/ClassicUO.Client/Game/GameObjects/Views/ItemView.cs b/src/ClassicUO.Client/Game/GameObjects/Views/ItemView.cs
+index d1765703b..5e13fa22f 100644
+--- a/src/ClassicUO.Client/Game/GameObjects/Views/ItemView.cs
++++ b/src/ClassicUO.Client/Game/GameObjects/Views/ItemView.cs
+@@ -59,6 +59,20 @@ namespace ClassicUO.Game.GameObjects
+             ushort hue = Hue;
+             ushort graphic = DisplayedGraphic;
+             bool partial = ItemData.IsPartialHue;
++
++            // MyShard: Store ship DYE for the ship's own tile + every component (tiller/hatch/sail/hold/plank) — the
++            // server marks each part's serial with the pilot's chosen hue. Recolour to that hue (full hue).
++            // Hue == 0 guard: skip parts that already carry a colour, so the ship's Hits (green) / Mana (blue) status
++            // bars stay their own colour instead of being dyed.
++            if (Hue == 0)
++            {
++                ushort shipDye = ClassicUO.Game.Managers.ShipDyeManager.GetDye(Serial);
++                if (shipDye != 0)
++                {
++                    hue = shipDye;
++                    partial = false;
++                }
++            }
+             if (ProfileManager.CurrentProfile.AutoAvoidObstacules) {
+                 if  (StaticFilters.isHumanAndMonster(graphic))
+                 {
+diff --git a/src/ClassicUO.Client/Game/GameObjects/Views/MobileView.cs b/src/ClassicUO.Client/Game/GameObjects/Views/MobileView.cs
+index f56177a43..dcc37aabc 100644
+--- a/src/ClassicUO.Client/Game/GameObjects/Views/MobileView.cs
++++ b/src/ClassicUO.Client/Game/GameObjects/Views/MobileView.cs
+@@ -158,6 +158,15 @@ namespace ClassicUO.Game.GameObjects
+                 }
+             }
+ 
++            // MyShard: Store mount DYE — recolour ONLY the mount (not the rider) to this rider's applied dye hue.
++            ushort mountHue = overridenHue;
++            if (mount != null)
++            {
++                ushort mdye = ClassicUO.Game.Managers.MountDyeManager.GetDye(Serial);
++                if (mdye != 0)
++                    mountHue = mdye;
++            }
++
+             sbyte mountOffsetY = 0;
+ 
+             if (isHuman && mount != null && mount.Graphic != 0x3E96)
+@@ -248,7 +257,7 @@ namespace ClassicUO.Game.GameObjects
+                         false,
+                         depth,
+                         mountOffsetY,
+-                        overridenHue,
++                        mountHue,
+                         charSitting,
+                         drawAsSingleLayer: drawMountAsSingleLayer
+                     );
+diff --git a/src/ClassicUO.Client/Game/GameObjects/Views/MultiView.cs b/src/ClassicUO.Client/Game/GameObjects/Views/MultiView.cs
+index cb877c5fb..ff97c6bd1 100644
+--- a/src/ClassicUO.Client/Game/GameObjects/Views/MultiView.cs
++++ b/src/ClassicUO.Client/Game/GameObjects/Views/MultiView.cs
+@@ -66,6 +66,20 @@ namespace ClassicUO.Game.GameObjects
+             ushort graphic = Graphic;
+             bool partial = ItemData.IsPartialHue;
+ 
++            // MyShard: Store ship DYE — if this component belongs to a ship the pilot dyed, recolour the tile to that
++            // hue (full hue, not partial). Special states below (highlight / out-of-range / dead) still override it.
++            // Hue == 0 guard: only recolour parts that DON'T already carry a colour, so the ship's Hits (green) /
++            // Mana (blue) status bars keep their own colour instead of being dyed.
++            if (OwnerSerial != 0 && Hue == 0)
++            {
++                ushort shipDye = ClassicUO.Game.Managers.ShipDyeManager.GetDye(OwnerSerial);
++                if (shipDye != 0)
++                {
++                    hue = shipDye;
++                    partial = false;
++                }
++            }
++
+             Profile currentProfile = ProfileManager.CurrentProfile;
+ 
+             if (currentProfile.HighlightGameObjects && SelectedObject.Object == this)
+diff --git a/src/ClassicUO.Client/Game/Managers/MountDyeManager.cs b/src/ClassicUO.Client/Game/Managers/MountDyeManager.cs
+new file mode 100644
+index 000000000..a96bb6d2a
+--- /dev/null
++++ b/src/ClassicUO.Client/Game/Managers/MountDyeManager.cs
+@@ -0,0 +1,30 @@
++using System.Collections.Generic;
++
++namespace ClassicUO.Game.Managers
++{
++    /// <summary>
++    /// Store-purchased MOUNT DYE. A player buys a UO hue in the Store and applies it; while they RIDE any mount, the
++    /// mount is recoloured to that hue for everyone. Like the weapon glow it is keyed per RIDER (mobile serial) — the
++    /// dye follows the player onto whatever mount they ride — and broadcast to every client. This manager holds
++    /// rider-serial -> hue (0 = none). The renderer (MobileView) recolours ONLY the mount, not the rider.
++    /// </summary>
++    public static class MountDyeManager
++    {
++        // rider (mobile) serial -> applied mount dye hue.
++        private static readonly Dictionary<uint, ushort> _dye = new();
++
++        /// <summary>Set/clear a rider's mount dye hue (server-driven, by serial). hue 0 = clear.</summary>
++        public static void SetDye(uint serial, ushort hue)
++        {
++            if (hue == 0)
++                _dye.Remove(serial);
++            else
++                _dye[serial] = hue;
++        }
++
++        /// <summary>Applied mount dye hue for this rider, or 0 if none.</summary>
++        public static ushort GetDye(uint serial) => _dye.TryGetValue(serial, out ushort h) ? h : (ushort)0;
++
++        public static void Clear() => _dye.Clear();
++    }
++}
+diff --git a/src/ClassicUO.Client/Game/Managers/ShipDyeManager.cs b/src/ClassicUO.Client/Game/Managers/ShipDyeManager.cs
+new file mode 100644
+index 000000000..cb43004a5
+--- /dev/null
++++ b/src/ClassicUO.Client/Game/Managers/ShipDyeManager.cs
+@@ -0,0 +1,32 @@
++using System.Collections.Generic;
++
++namespace ClassicUO.Game.Managers
++{
++    /// <summary>
++    /// Store-purchased SHIP DYE. A player buys a UO hue in the Store and applies it; while they PILOT any ship, the
++    /// WHOLE ship (multi tiles + the ship's own tile + every component: tiller, hatch, sail, hold, planks…) is
++    /// recoloured to that hue. Like the ship GLOW, the state is keyed per SHIP-PART SERIAL — the server (which owns
++    /// the pilot state) tells every client "part S is dyed hue H", and each client renders that serial with the hue.
++    /// This manager holds serial -> hue (0 = no dye). Mirrors <see cref="ShipGlowManager"/> but carries a hue instead
++    /// of a single on/off bit.
++    /// </summary>
++    public static class ShipDyeManager
++    {
++        // ship-part (multi tile / component item) serial -> applied dye hue.
++        private static readonly Dictionary<uint, ushort> _dye = new();
++
++        /// <summary>Set/clear a ship part's dye hue (server-driven, by serial). hue 0 = clear.</summary>
++        public static void SetDye(uint serial, ushort hue)
++        {
++            if (hue == 0)
++                _dye.Remove(serial);
++            else
++                _dye[serial] = hue;
++        }
++
++        /// <summary>Applied dye hue for this serial, or 0 if none.</summary>
++        public static ushort GetDye(uint serial) => _dye.TryGetValue(serial, out ushort h) ? h : (ushort)0;
++
++        public static void Clear() => _dye.Clear();
++    }
++}
+diff --git a/src/ClassicUO.Client/Game/UI/Gumps/PlayerHudGump.cs b/src/ClassicUO.Client/Game/UI/Gumps/PlayerHudGump.cs
+index 3e0a0b76a..58a14aa79 100644
+--- a/src/ClassicUO.Client/Game/UI/Gumps/PlayerHudGump.cs
++++ b/src/ClassicUO.Client/Game/UI/Gumps/PlayerHudGump.cs
+@@ -190,6 +190,11 @@ namespace ClassicUO.Game.UI.Gumps
+ 
+                 // MyShard Store: tell the server my applied ship-glow bitmask so it can glow my ship when I pilot it.
+                 StoreGump.PushShipGlow(world);
++
++                // MyShard Store: publish my applied ship-dye + mount-dye hues so the server can recolour my ship (on
++                // pilot) / my mount (relayed to everyone) right after login.
++                StoreGump.PushShipDye(world);
++                StoreGump.PushMountDye(world);
+             }
+ 
+             // Ask for the account's total online time so portrait unlocks can be detected live during play
+diff --git a/src/ClassicUO.Client/Game/UI/Gumps/StoreGump.cs b/src/ClassicUO.Client/Game/UI/Gumps/StoreGump.cs
+index 65eb295bd..c8b3a9161 100644
+--- a/src/ClassicUO.Client/Game/UI/Gumps/StoreGump.cs
++++ b/src/ClassicUO.Client/Game/UI/Gumps/StoreGump.cs
+@@ -57,8 +57,7 @@ namespace ClassicUO.Game.UI.Gumps
+             "Ship Dye",
+             "Eternal Mounts",
+             "Garden Cosmetics",
+-            "House Decoration",
+-            "Premium Membership",
++            "Premium",
+             "Silver",
+             "Gold",
+         };
+@@ -72,8 +71,7 @@ namespace ClassicUO.Game.UI.Gumps
+             "ship-logo.png",     // Ship Dye
+             "mount-logo.png",    // Eternal Mounts
+             "garden-logo.png",   // Garden Cosmetics
+-            "house-logo.png",    // House Decoration
+-            "pre-logo.png",      // Premium Membership
++            "pre-logo.png",      // Premium
+             "silver-logo.png",   // Silver
+             "gold-logo.png",     // Gold
+         };
+@@ -255,6 +253,41 @@ namespace ClassicUO.Game.UI.Gumps
+                 return;
+             }
+ 
++            // Premium: özel düzen — 3 süre kartı (5/15/30 Gün) + avantajlar listesi + "Gold ile premium al".
++            if (catName == "Premium")
++            {
++                BuildPremiumPage(world, page);
++                return;
++            }
++
++            // Silver: Kredi'yi GERÇEK PARA (TL) ile satın alma — 6 paket.
++            if (catName == "Silver")
++            {
++                BuildSilverPage(world, page);
++                return;
++            }
++
++            // Gold: Kredi'yi oyun-içi ALTIN (gp) ile satın alma — 3 paket.
++            if (catName == "Gold")
++            {
++                BuildGoldPage(world, page);
++                return;
++            }
++
++            // Ship Dye: her UO hue için bir kart (Buy -> Apply -> Default); apply -> pilotta tüm gemi o renge boyanır.
++            if (catName == "Ship Dye")
++            {
++                BuildShipDyePage(world, page);
++                return;
++            }
++
++            // Mount Dye: Ship Dye ile aynı — her UO hue için kart; apply -> bindiğin binek o renge boyanır (herkese).
++            if (catName == "Mount Dye")
++            {
++                BuildMountDyePage(world, page);
++                return;
++            }
++
+             const int usableW = W - LEFT_W - CPAD * 2 - 15;
+             int cellW = (usableW - GAP * (COLS - 1)) / COLS;   // fit the columns to the content width
+ 
+@@ -322,6 +355,225 @@ namespace ClassicUO.Game.UI.Gumps
+             }
+         }
+ 
++        // Premium kategorisi: özel düzen — 3 süre kartı (üstte, ortalanmadan sola hizalı), altında "Premium
++        // Avantajları" listesi ve sol-altta "Gold ile premium al." Pencereye sığdırılmış. Kartlar tıklanabilir
++        // -> satın alma onayı -> server'a StorePurchase isteği.
++        private void BuildPremiumPage(World world, int page)
++        {
++            PNGLoader.Instance.TryGetEmbeddedTexture("store-premium.png", out Texture2D redGem);   // kırmızı taş (Kredi/Premium)
++            PNGLoader.Instance.TryGetEmbeddedTexture("store-gold.png", out Texture2D greenGem);     // yeşil taş (Gold)
++            PNGLoader.Instance.TryGetEmbeddedTexture("pre-logo.png", out Texture2D preLogo);        // Premium başlık logosu
++
++            Color green = new Color(120, 210, 120);
++
++            Action<string, string> doBuy = (id, price) =>
++            {
++                AsyncNetClient.Socket?.Send_StorePurchase(id, "Premium", price);
++                GameActions.Print(world, $"[Store] Premium satın alındı ({price}).");
++            };
++
++            // days, krediPrice, krediId, goldPrice (null = bu kartta gold modu yok), goldId
++            (string days, string kredi, string kid, string gold, string gid)[] tiers =
++            {
++                ("5 Gün",  "500 Kredi",  "premium_5d",  null,          null),
++                ("15 Gün", "1000 Kredi", "premium_15d", null,          null),
++                ("30 Gün", "1850 Kredi", "premium_30d", "3.285.000gp", "premium_30d_gold"),
++            };
++
++            const int leftMargin = 40;
++            const int cardW = 200, cardH = 220, cardGap = 32, cardY = 28;
++
++            PremiumCard card30 = null;
++            for (int i = 0; i < tiers.Length; i++)
++            {
++                (string days, string kredi, string kid, string gold, string gid) t = tiers[i];
++                PremiumCard card = new PremiumCard(world, cardW, cardH, t.days, t.kredi, t.kid, t.gold, t.gid,
++                    preLogo, new Color(198, 148, 255), redGem, green, doBuy)
++                {
++                    X = leftMargin + i * (cardW + cardGap),
++                    Y = cardY
++                };
++                _content.Content.Add(card, page);
++                if (t.gold != null) card30 = card;
++            }
++
++            // "Premium Avantajları:" başlığı + maddeler (sol hizalı, kartların altında).
++            int advY = cardY + cardH + 44;
++            TextBox head = TextBox.GetOne("Premium Avantajları:", FONT_LABEL, 20, Gold, TextBox.RTLOptions.Default());
++            head.X = leftMargin; head.Y = advY; head.AcceptMouseInput = false;
++            _content.Content.Add(head, page);
++
++            string[] advs =
++            {
++                "%50 Daha Fazla Exp",
++                "%50 Daha Fazla Altın",
++                "%50 Daha Fazla Drop Şans",
++                "Ada Satın Alma",
++            };
++            for (int i = 0; i < advs.Length; i++)
++            {
++                TextBox a = TextBox.GetOne(advs[i], FONT_BODY, 17, TextNormal, TextBox.RTLOptions.Default());
++                a.X = leftMargin + 22; a.Y = advY + 42 + i * 32; a.AcceptMouseInput = false;
++                _content.Content.Add(a, page);
++            }
++
++            // "Gold ile premium al." etiketi (yeşil taş + metin) + sağında aç/kapat toggle. Toggle AÇILINCA sadece
++            // 30 Gün kartı Kredi yerine GOLD fiyatına (3.285.000gp) döner (card30.SetGoldMode).
++            int gy = 600;
++            PremiumGoldButton label = new PremiumGoldButton(world, greenGem, "Gold ile premium al.", green)
++            { X = leftMargin, Y = gy };
++            _content.Content.Add(label, page);
++
++            ToggleSwitch toggle = new ToggleSwitch(false, on => card30?.SetGoldMode(on))
++            { X = leftMargin + label.Width + 14, Y = gy + (label.Height - 22) / 2 };
++            _content.Content.Add(toggle, page);
++
++            label.Clicked = () => toggle.Toggle();   // etikete tıklamak da toggle'ı çevirir
++        }
++
++        // Silver kategorisi: Kredi'yi GERÇEK PARA (TL) ile satın alma — 6 paket (2 satır x 3). Kart: üstte "TL"
++        // tutarı, ortada gümüş yığın (UO art hue'lu), altta yeşil Kredi karşılığı.
++        private void BuildSilverPage(World world, int page)
++        {
++            (string tl, string kredi, string id)[] packs =
++            {
++                ("30",  "500 Kredi",    "kredi_30tl"),
++                ("45",  "1.000 Kredi",  "kredi_45tl"),
++                ("75",  "2.000 Kredi",  "kredi_75tl"),
++                ("165", "5.000 Kredi",  "kredi_165tl"),
++                ("315", "10.000 Kredi", "kredi_315tl"),
++                ("450", "15.000 Kredi", "kredi_450tl"),
++            };
++
++            PNGLoader.Instance.TryGetEmbeddedTexture("silver-logo.png", out Texture2D silverLogo);
++
++            Color green = new Color(120, 210, 120);
++            Color light = new Color(232, 234, 240);
++
++            int usableW = W - LEFT_W - CPAD * 2 - 15;
++            int cellW = (usableW - GAP * (COLS - 1)) / COLS;
++            const int cardH = 210;
++
++            for (int i = 0; i < packs.Length; i++)
++            {
++                (string tl, string kredi, string id) p = packs[i];
++                int col = i % COLS, row = i / COLS;
++                PackCard card = new PackCard(world, cellW, cardH, p.tl, "TL", light, silverLogo, new Color(130, 195, 255), p.kredi, green, null,
++                    () =>
++                    {
++                        AsyncNetClient.Socket?.Send_StorePurchase(p.id, p.tl + " TL", p.kredi);
++                        GameActions.Print(world, $"[Store] {p.kredi} — {p.tl} TL ile satın alma.");
++                    })
++                {
++                    X = CPAD + col * (cellW + GAP),
++                    Y = 16 + row * (cardH + GAP)
++                };
++                _content.Content.Add(card, page);
++            }
++        }
++
++        // Gold kategorisi: Kredi'yi oyun-içi ALTIN (gp) ile satın alma — 3 paket. Kart: üstte turuncu gp tutarı,
++        // ortada altın yığın (UO art), altında yeşil Kredi karşılığı + en altta kırmızı taş.
++        private void BuildGoldPage(World world, int page)
++        {
++            PNGLoader.Instance.TryGetEmbeddedTexture("store-premium.png", out Texture2D redGem);
++            PNGLoader.Instance.TryGetEmbeddedTexture("gold-logo.png", out Texture2D goldLogo);
++
++            (string gp, string kredi, string id)[] packs =
++            {
++                ("875.000gp",   "1.385 Kredi", "kredi_gold_1"),
++                ("1.750.000gp", "2.775 Kredi", "kredi_gold_2"),
++                ("3.500.000gp", "5.550 Kredi", "kredi_gold_3"),
++            };
++
++            Color green = new Color(120, 210, 120);
++            Color orange = new Color(240, 170, 60);
++
++            int usableW = W - LEFT_W - CPAD * 2 - 15;
++            int cellW = (usableW - GAP * (COLS - 1)) / COLS;
++            const int cardH = 224;
++
++            for (int i = 0; i < packs.Length; i++)
++            {
++                (string gp, string kredi, string id) p = packs[i];
++                PackCard card = new PackCard(world, cellW, cardH, p.gp, null, orange, goldLogo, new Color(255, 176, 92), p.kredi, green, redGem,
++                    () =>
++                    {
++                        AsyncNetClient.Socket?.Send_StorePurchase(p.id, p.gp, p.kredi);
++                        GameActions.Print(world, $"[Store] {p.kredi} — {p.gp} ile satın alma.");
++                    })
++                {
++                    X = CPAD + i * (cellW + GAP),
++                    Y = 16
++                };
++                _content.Content.Add(card, page);
++            }
++        }
++
++        // Ship Dye kategorisi: verilen her UO hue için bir kart (Buy -> Apply -> Default), şimdilik görselsiz (boş).
++        // Apply -> profildeki tek aktif dye hue set edilir + server'a push; pilota geçince tüm gemi o renge boyanır
++        // (server broadcast, ShipDyeManager). Yeni renkler geldikçe hues dizisine eklenir.
++        private void BuildShipDyePage(World world, int page)
++        {
++            ushort[] hues =
++            {
++                1153, 1173, 1159, 1154, 1158, 1756, 1921, 1909, 1993,
++                1947, 1927, 1926, 1948, 1960, 1953, 1996, 1945, 2052, 2098, 2179, 2232, 2368, 2609,
++            };
++            int[] priceCycle = { 300, 450, 500, 650, 400, 550 };   // "rastgele" çeşitli Kredi fiyatları
++
++            List<Control> cards = new List<Control>();
++            for (int i = 0; i < hues.Length; i++)
++            {
++                ushort hue = hues[i];   // döngü-yerel: closure doğru hue'yu yakalar
++                string code = hue.ToString("D4");   // 4-hane sıfır-dolgulu (784 -> 0784) — UO hue referansıyla eşleşsin
++                string id = "sd_" + code;
++                string title = "Ship Dye " + code;
++                string price = priceCycle[i % priceCycle.Length] + " Kredi";
++                cards.Add(new GlowToggleCard(world, null, title, price, id,
++                    () => ApplyShipDye(world, hue),
++                    () => RemoveShipDye(world),
++                    () => IsShipDyeActive(hue),
++                    15944, hue));   // önizleme: item 15944, karttaki hue'ya boyalı
++            }
++
++            LayoutGrid(cards, 16);
++            foreach (Control c in cards)
++                _content.Content.Add(c, page);
++        }
++
++        // Mount Dye kategorisi: Ship Dye ile aynı (aynı hue listesi + Silver/Kredi), görsel olarak item 41565 karttaki
++        // hue'ya boyalı gösterilir. Apply -> profildeki tek aktif mount-dye hue set edilir + server'a push (herkese
++        // relay); oyuncu HERHANGİ bir bineğe binince o binek o renge boyanır (MobileView, yalnızca binek).
++        private void BuildMountDyePage(World world, int page)
++        {
++            ushort[] hues =
++            {
++                1153, 1173, 1159, 1154, 1158, 1756, 1921, 1909, 1993,
++                1947, 1927, 1926, 1948, 1960, 1953, 1996, 1945, 2052, 2098, 2179, 2232, 2368, 2609,
++            };
++            int[] priceCycle = { 300, 450, 500, 650, 400, 550 };
++
++            List<Control> cards = new List<Control>();
++            for (int i = 0; i < hues.Length; i++)
++            {
++                ushort hue = hues[i];
++                string code = hue.ToString("D4");
++                string id = "md_" + code;
++                string title = "Mount Dye " + code;
++                string price = priceCycle[i % priceCycle.Length] + " Kredi";
++                cards.Add(new GlowToggleCard(world, null, title, price, id,
++                    () => ApplyMountDye(world, hue),
++                    () => RemoveMountDye(world),
++                    () => IsMountDyeActive(hue),
++                    41565, hue));   // önizleme: item 41565, karttaki hue'ya boyalı
++            }
++
++            LayoutGrid(cards, 16);
++            foreach (Control c in cards)
++                _content.Content.Add(c, page);
++        }
++
+         // Glow Effect category: sub-tabs Weapon / Mount / Ship / Portrait. Weapon shows the animated weapon-glow.gif
+         // product; the others are placeholder products for now.
+         private void BuildGlowPage(World world, int page)
+@@ -685,6 +937,76 @@ namespace ClassicUO.Game.UI.Gumps
+             AsyncNetClient.Socket?.Send_ShipGlow(mask);
+         }
+ 
++        // ---- ship dye (single applied UO hue; recolours the whole ship while PILOTING, server-driven) ----
++        private static bool IsShipDyeActive(ushort hue)
++        {
++            Profile prof = ProfileManager.CurrentProfile;
++            return prof != null && hue != 0 && prof.StoreShipDyeHue == hue;
++        }
++
++        private static void ApplyShipDye(World world, ushort hue)
++        {
++            Profile prof = ProfileManager.CurrentProfile;
++            if (prof == null || hue == 0)
++                return;
++            prof.StoreShipDyeHue = hue;   // only ONE dye active at a time (applying replaces the previous)
++            PushShipDye(world);
++            GameActions.Print(world, "[Store] Ship dye applied — board the ship and take the helm to see it.");
++        }
++
++        private static void RemoveShipDye(World world)
++        {
++            Profile prof = ProfileManager.CurrentProfile;
++            if (prof == null)
++                return;
++            prof.StoreShipDyeHue = 0;
++            PushShipDye(world);
++            GameActions.Print(world, "[Store] Ship dye removed.");
++        }
++
++        // Publish my applied ship-dye hue to the server (it recolours the whole ship for everyone while I pilot). 0 = none.
++        public static void PushShipDye(World world)
++        {
++            Profile prof = ProfileManager.CurrentProfile;
++            ushort hue = (ushort)(prof?.StoreShipDyeHue ?? 0);
++            AsyncNetClient.Socket?.Send_ShipDye(hue);
++        }
++
++        // ---- mount dye (single applied UO hue; recolours the ridden mount, server-broadcast to everyone) ----
++        private static bool IsMountDyeActive(ushort hue)
++        {
++            Profile prof = ProfileManager.CurrentProfile;
++            return prof != null && hue != 0 && prof.StoreMountDyeHue == hue;
++        }
++
++        private static void ApplyMountDye(World world, ushort hue)
++        {
++            Profile prof = ProfileManager.CurrentProfile;
++            if (prof == null || hue == 0)
++                return;
++            prof.StoreMountDyeHue = hue;   // only ONE dye active at a time (applying replaces the previous)
++            PushMountDye(world);
++            GameActions.Print(world, "[Store] Mount dye applied — mount up to see it (any mount you ride is dyed).");
++        }
++
++        private static void RemoveMountDye(World world)
++        {
++            Profile prof = ProfileManager.CurrentProfile;
++            if (prof == null)
++                return;
++            prof.StoreMountDyeHue = 0;
++            PushMountDye(world);
++            GameActions.Print(world, "[Store] Mount dye removed.");
++        }
++
++        // Publish my applied mount-dye hue to the server (relayed to everyone -> my mount is recoloured). 0 = none.
++        public static void PushMountDye(World world)
++        {
++            Profile prof = ProfileManager.CurrentProfile;
++            ushort hue = (ushort)(prof?.StoreMountDyeHue ?? 0);
++            AsyncNetClient.Socket?.Send_MountDye(hue);
++        }
++
+         // Nudge the player + target HUDs by (+17,+10) when a frame is applied, back when removed. Idempotent
+         // (guarded by the persisted flag) so repeated Apply/Default clicks don't drift the HUDs.
+         private static void SetFrameHudShift(bool on)
+@@ -994,16 +1316,18 @@ namespace ClassicUO.Game.UI.Gumps
+             private readonly RoundButton _btn;
+             private readonly string _title, _price, _purchaseId;
+             private readonly Action _onApply, _onRemove;
++            private readonly Func<bool> _isActive;
+             private int _state;   // 0 = Buy, 1 = owned (Apply), 2 = active (Default)
+ 
+             public GlowToggleCard(World world, GifImage gif, string title, string price, string purchaseId,
+-                Action onApply, Action onRemove, Func<bool> isActive)
++                Action onApply, Action onRemove, Func<bool> isActive, ushort previewGraphic = 0, ushort previewHue = 0)
+             {
+                 _title = title;
+                 _price = price;
+                 _purchaseId = purchaseId;
+                 _onApply = onApply;
+                 _onRemove = onRemove;
++                _isActive = isActive;
+ 
+                 _pad = 12;
+                 bool ok = gif != null && gif.IsValid;
+@@ -1022,6 +1346,19 @@ namespace ClassicUO.Game.UI.Gumps
+                     gif.Y = 8;
+                     Add(gif);
+                 }
++                else if (previewGraphic != 0)
++                {
++                    // MyShard: UO item art önizlemesi (ör. Ship Dye), kartın hue'suna boyalı; görsel alanına ortalı.
++                    // Oyuncu bu item'in rengiyle gemiyi hangi renge boyayacağını görür.
++                    StaticPic pic = new StaticPic(previewGraphic, previewHue);
++                    if (!pic.IsDisposed)
++                    {
++                        pic.AcceptMouseInput = false;
++                        pic.X = _pad + (_imgW - pic.Width) / 2;
++                        pic.Y = 8 + (_gifH - pic.Height) / 2;
++                        Add(pic);
++                    }
++                }
+ 
+                 TextBox t = TextBox.GetOne(title, FONT_LABEL, 16, TextNormal, TextBox.RTLOptions.DefaultCentered(Width - 16));
+                 t.X = 8;
+@@ -1081,6 +1418,16 @@ namespace ClassicUO.Game.UI.Gumps
+ 
+             public override bool Draw(UltimaBatcher2D batcher, int x, int y)
+             {
++                // Keep the Apply/Default button in sync with the LIVE active state. For single-active categories (ship
++                // dye: only one hue applied at a time), applying another card deactivates this one, so its button must
++                // fall back "Default" -> "Apply" on its own. No-op for multi-active categories (glow bitmasks).
++                if (_state != 0 && _isActive != null)
++                {
++                    bool active = _isActive();
++                    if (active && _state == 1) { _state = 2; _btn.SetState("Default", CGrey); }
++                    else if (!active && _state == 2) { _state = 1; _btn.SetState("Apply", CGreen); }
++                }
++
+                 DrawRounded(batcher, x, y, Width, Height, 10, CardBg, new Color(44, 48, 60), 1, true, true, true, true);
+                 DrawRounded(batcher, x + _pad, y + 8, _imgW, _gifH, 8, CardInner, Color.Transparent, 0, true, true, true, true);
+                 base.Draw(batcher, x, y);
+@@ -1140,6 +1487,237 @@ namespace ClassicUO.Game.UI.Gumps
+             }
+         }
+ 
++        // ---------- Premium süre kartı: üstte Premium logosu + "X Gün", ortada taş, altta fiyat; TÜM kart tıklanabilir ----------
++        // Gold modu: goldPrice verilmişse SetGoldMode(true) fiyatı Kredi->Gold'a çevirir (yalnızca 30 Gün kartı).
++        private sealed class PremiumCard : Control
++        {
++            private readonly Texture2D _logo, _gem;
++            private readonly int _logoW, _logoH, _gemW, _gemH, _gemY, _priceY, _cardW;
++            private readonly string _days, _kredi, _kid, _gold, _gid;
++            private readonly Color _priceColor, _logoTint;
++            private readonly Action<string, string> _buy;
++            private TextBox _priceBox;
++            private bool _goldMode;
++
++            public PremiumCard(World world, int w, int h, string days, string krediPrice, string krediId,
++                string goldPrice, string goldId, Texture2D logo, Color logoTint, Texture2D gem, Color priceColor, Action<string, string> buy)
++            {
++                _days = days; _kredi = krediPrice; _kid = krediId; _gold = goldPrice; _gid = goldId;
++                _logo = logo; _logoTint = logoTint; _gem = gem; _priceColor = priceColor; _buy = buy; _cardW = w;
++                Width = w; Height = h;
++                CanMove = true; AcceptMouseInput = true; WantUpdateSize = false;
++
++                const int topY = 12;
++                if (logo != null && logo.Height > 0)
++                {
++                    // Orijinal boyut (küçültme yok).
++                    _logoW = logo.Width;
++                    _logoH = logo.Height;
++                }
++                else
++                {
++                    TextBox pm = TextBox.GetOne("Premium", FONT_LABEL, 18, Gold, TextBox.RTLOptions.DefaultCentered(w));
++                    pm.X = 0; pm.Y = topY; pm.AcceptMouseInput = false; Add(pm);
++                }
++
++                // "X Gün" — logonun/başlığın hemen altında, ortalı.
++                TextBox d = TextBox.GetOne(days, FONT_LABEL, 20, Gold, TextBox.RTLOptions.DefaultCentered(w));
++                d.X = 0; d.Y = topY + (_logoH > 0 ? _logoH : 24) + 6; d.AcceptMouseInput = false; Add(d);
++
++                // taş — logonun ve "X Gün" yazısının altında, ortada.
++                if (gem != null && gem.Height > 0)
++                {
++                    _gemH = 44;
++                    _gemW = (int)(gem.Width * (_gemH / (float)gem.Height));
++                    _gemY = topY + (_logoH > 0 ? _logoH : 24) + 40;
++                }
++
++                _priceY = h - 40;
++                SetPrice(krediPrice, _priceColor);
++            }
++
++            private void SetPrice(string text, Color color)
++            {
++                _priceBox?.Dispose();
++                _priceBox = TextBox.GetOne(text, FONT_LABEL, 18, color, TextBox.RTLOptions.DefaultCentered(_cardW));
++                _priceBox.X = 0; _priceBox.Y = _priceY; _priceBox.AcceptMouseInput = false;
++                Add(_priceBox);
++            }
++
++            // Yalnızca gold fiyatı olan kart (30 Gün) etkilenir: AÇIK -> Gold fiyatı (SARI), KAPALI -> Kredi fiyatı (yeşil).
++            public void SetGoldMode(bool on)
++            {
++                if (string.IsNullOrEmpty(_gold))
++                    return;
++                _goldMode = on;
++                SetPrice(on ? _gold : _kredi, on ? Gold : _priceColor);
++            }
++
++            public override void OnMouseUp(int x, int y, MouseButtonType button)
++            {
++                base.OnMouseUp(x, y, button);
++                if (button != MouseButtonType.Left)
++                    return;
++                string id = _goldMode ? _gid : _kid;
++                string label = _goldMode ? _gold : _kredi;
++                ConfirmPurchase($"{_days} Premium", label, () => _buy?.Invoke(id, label));
++            }
++
++            public override bool Draw(UltimaBatcher2D batcher, int x, int y)
++            {
++                DrawRounded(batcher, x, y, Width, Height, 10, CardBg, new Color(150, 120, 60), 2, true, true, true, true);
++                base.Draw(batcher, x, y);
++                if (_logo != null && _logoW > 0)
++                    batcher.Draw(_logo, new Vector2(x + (Width - _logoW) / 2f, y + 12), null, _logoTint, 0f, Vector2.One, 0f);
++                if (_gem != null && _gemW > 0)
++                    batcher.Draw(_gem, new Rectangle(x + (Width - _gemW) / 2, y + _gemY, _gemW, _gemH), null, ShaderHueTranslator.GetHueVector(0, false, 1f));
++                if (MouseIsOver)
++                    DrawRounded(batcher, x - 3, y - 3, Width + 6, Height + 6, 13, Color.Transparent, Gold, 3, true, true, true, true);
++                return true;
++            }
++        }
++
++        // ---------- "Gold ile premium al." — yeşil taş + metin (Clicked opsiyonel) ----------
++        private sealed class PremiumGoldButton : Control
++        {
++            public Action Clicked;
++            private readonly Texture2D _gem;
++            private readonly int _gemW, _gemH;
++
++            public PremiumGoldButton(World world, Texture2D gem, string label, Color labelColor)
++            {
++                _gem = gem;
++                CanMove = true; AcceptMouseInput = true; WantUpdateSize = false;
++
++                _gemH = 26;
++                _gemW = (gem != null && gem.Height > 0) ? (int)(gem.Width * (_gemH / (float)gem.Height)) : _gemH;
++
++                TextBox t = TextBox.GetOne(label, FONT_LABEL, 17, labelColor, TextBox.RTLOptions.Default());
++                t.X = _gemW + 10; t.Y = (_gemH - t.Height) / 2; t.AcceptMouseInput = false; Add(t);
++
++                Width = _gemW + 10 + t.Width;
++                Height = Math.Max(_gemH, t.Height);
++            }
++
++            public override void OnMouseUp(int x, int y, MouseButtonType button)
++            {
++                base.OnMouseUp(x, y, button);
++                if (button == MouseButtonType.Left)
++                    Clicked?.Invoke();
++            }
++
++            public override bool Draw(UltimaBatcher2D batcher, int x, int y)
++            {
++                if (_gem != null)
++                {
++                    float a = MouseIsOver ? 1f : 0.9f;
++                    batcher.Draw(_gem, new Rectangle(x, y + (Height - _gemH) / 2, _gemW, _gemH), null, ShaderHueTranslator.GetHueVector(0, false, a));
++                }
++                return base.Draw(batcher, x, y);
++            }
++        }
++
++        // ---------- aç/kapat toggle (yuvarlak pill + kayan beyaz daire) ----------
++        private sealed class ToggleSwitch : Control
++        {
++            private bool _on;
++            private readonly Action<bool> _onChanged;
++
++            public ToggleSwitch(bool on, Action<bool> onChanged)
++            {
++                _on = on; _onChanged = onChanged;
++                Width = 44; Height = 22;
++                CanMove = true; AcceptMouseInput = true; WantUpdateSize = false;
++            }
++
++            public void Toggle()
++            {
++                _on = !_on;
++                _onChanged?.Invoke(_on);
++            }
++
++            public override void OnMouseUp(int x, int y, MouseButtonType button)
++            {
++                base.OnMouseUp(x, y, button);
++                if (button == MouseButtonType.Left)
++                    Toggle();
++            }
++
++            public override bool Draw(UltimaBatcher2D batcher, int x, int y)
++            {
++                Color track = _on ? GoldBtn : new Color(70, 74, 84);
++                DrawRounded(batcher, x, y, Width, Height, Height / 2, track, Color.Transparent, 0, true, true, true, true);
++                int r = Height - 6;
++                int cx = _on ? x + Width - r - 3 : x + 3;
++                DrawRounded(batcher, cx, y + 3, r, r, r / 2, Color.White, Color.Transparent, 0, true, true, true, true);
++                return base.Draw(batcher, x, y);
++            }
++        }
++
++        // ---------- Kredi paket kartı (Silver=TL / Gold=gp): üstte tutar, altında kategori logosu (orijinal boyut +
++        // tint), altta Kredi karşılığı (+ ops. taş) ----------
++        private sealed class PackCard : Control
++        {
++            private readonly Texture2D _gem, _logo;
++            private readonly Color _logoTint;
++            private readonly int _gemW, _gemH, _gemY, _logoY;
++            private readonly string _title, _price;
++            private readonly Action _onBuy;
++
++            public PackCard(World world, int w, int h, string line1, string line2, Color topColor,
++                Texture2D logo, Color logoTint, string kredi, Color krediColor, Texture2D gem, Action onBuy)
++            {
++                _title = line1; _price = kredi; _onBuy = onBuy; _gem = gem; _logo = logo; _logoTint = logoTint;
++                Width = w; Height = h;
++                CanMove = true; AcceptMouseInput = true; WantUpdateSize = false;
++
++                TextBox t1 = TextBox.GetOne(line1, FONT_LABEL, 20, topColor, TextBox.RTLOptions.DefaultCentered(w));
++                t1.X = 0; t1.Y = 14; t1.AcceptMouseInput = false; Add(t1);
++
++                bool two = !string.IsNullOrEmpty(line2);
++                if (two)
++                {
++                    TextBox t2 = TextBox.GetOne(line2, FONT_LABEL, 18, topColor, TextBox.RTLOptions.DefaultCentered(w));
++                    t2.X = 0; t2.Y = 40; t2.AcceptMouseInput = false; Add(t2);
++                }
++
++                // Kategori logosu — fiyatın altında, ortada, orijinal boyutta (Draw'da tint ile çizilir).
++                _logoY = two ? 70 : 48;
++
++                // Kredi karşılığı (yeşil) — taş varsa biraz yukarıda.
++                int priceY = gem != null ? h - 62 : h - 40;
++                TextBox pr = TextBox.GetOne(kredi, FONT_LABEL, 17, krediColor, TextBox.RTLOptions.DefaultCentered(w));
++                pr.X = 0; pr.Y = priceY; pr.AcceptMouseInput = false; Add(pr);
++
++                if (gem != null && gem.Height > 0)
++                {
++                    _gemH = 34;
++                    _gemW = (int)(gem.Width * (_gemH / (float)gem.Height));
++                    _gemY = h - _gemH - 8;
++                }
++            }
++
++            public override void OnMouseUp(int x, int y, MouseButtonType button)
++            {
++                base.OnMouseUp(x, y, button);
++                if (button == MouseButtonType.Left)
++                    ConfirmPurchase(_title, _price, () => _onBuy?.Invoke());
++            }
++
++            public override bool Draw(UltimaBatcher2D batcher, int x, int y)
++            {
++                DrawRounded(batcher, x, y, Width, Height, 10, CardBg, new Color(150, 120, 60), 2, true, true, true, true);
++                base.Draw(batcher, x, y);
++                if (_logo != null)
++                    batcher.Draw(_logo, new Vector2(x + (Width - _logo.Width) / 2f, y + _logoY), null, _logoTint, 0f, Vector2.One, 0f);
++                if (_gem != null && _gemW > 0)
++                    batcher.Draw(_gem, new Rectangle(x + (Width - _gemW) / 2, y + _gemY, _gemW, _gemH), null, ShaderHueTranslator.GetHueVector(0, false, 1f));
++                if (MouseIsOver)
++                    DrawRounded(batcher, x - 3, y - 3, Width + 6, Height + 6, 13, Color.Transparent, Gold, 3, true, true, true, true);
++                return true;
++            }
++        }
++
+         // ---------- product tile backed by a real UO item art (graphic id) ----------
+         // Repeatable purchase: the button always stays "Buy" (buy any quantity), no Apply / no persistence.
+         private sealed class ItemCard : Control
+diff --git a/src/ClassicUO.Client/LegionScripting/docs/LegionAPI.md b/src/ClassicUO.Client/LegionScripting/docs/LegionAPI.md
+index 189a368bd..1429e38b5 100644
+--- a/src/ClassicUO.Client/LegionScripting/docs/LegionAPI.md
++++ b/src/ClassicUO.Client/LegionScripting/docs/LegionAPI.md
+@@ -21,7 +21,7 @@ You can now type `-updateapi` in game to download the latest API.py file.
+ 
+ [Additional notes](../notes/)  
+ 
+-*This was generated on `7.10.26`.*
++*This was generated on `7.12.26`.*
+ 
+ ## Properties
+ ### `Events`
+diff --git a/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedOutgoingPackets.cs b/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedOutgoingPackets.cs
+index 7987356eb..dc28a71c1 100644
+--- a/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedOutgoingPackets.cs
++++ b/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedOutgoingPackets.cs
+@@ -167,6 +167,34 @@ internal static class EnhancedOutgoingPackets
+         writer.Dispose();
+     }
+ 
++    // Client -> server: publish your applied Store ship-DYE hue. The server keeps it and, when you take the helm of
++    // ANY ship, tells everyone to recolour that whole ship to this hue. 0 = none (removes the dye).
++    public static void Send_ShipDye(this AsyncNetClient socket, ushort hue)
++    {
++        StackDataWriter f = Extensions.GetWriter(EnhancedPacketType.ShipDye);
++        ref StackDataWriter writer = ref f;
++
++        writer.WriteUInt16BE(hue);
++
++        writer.FinalLength();
++        socket.Send(writer.BufferWritten, true);
++        writer.Dispose();
++    }
++
++    // Client -> server: publish your applied Store mount-DYE hue. The server keeps it and relays it to everyone, who
++    // recolour YOUR mount (whatever you ride) to this hue. 0 = none (removes the dye).
++    public static void Send_MountDye(this AsyncNetClient socket, ushort hue)
++    {
++        StackDataWriter f = Extensions.GetWriter(EnhancedPacketType.MountDye);
++        ref StackDataWriter writer = ref f;
++
++        writer.WriteUInt16BE(hue);
++
++        writer.FinalLength();
++        socket.Send(writer.BufferWritten, true);
++        writer.Dispose();
++    }
++
+     // Client -> server: send a global "Trade" chat message. The server relays it (tagged with the sender's
+     // character name) to every online player, who show it under their Trade journal tab (same model as World Chat).
+     public static void Send_TradeChat(this AsyncNetClient socket, string message)
+diff --git a/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedPacketHandler.cs b/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedPacketHandler.cs
+index cdc1f8b75..3a4a124a5 100644
+--- a/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedPacketHandler.cs
++++ b/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedPacketHandler.cs
+@@ -51,6 +51,8 @@ public class EnhancedPacketHandler
+         Handler.Add(EnhancedPacketType.StorePortrait, OnStorePortrait);
+         Handler.Add(EnhancedPacketType.WeaponGlow, OnWeaponGlow);
+         Handler.Add(EnhancedPacketType.ShipGlowState, OnShipGlowState);
++        Handler.Add(EnhancedPacketType.ShipDyeState, OnShipDyeState);
++        Handler.Add(EnhancedPacketType.MountDyeState, OnMountDyeState);
+         Handler.Add(EnhancedPacketType.StoreOwnedList, OnStoreOwnedList);
+     }
+ 
+@@ -99,6 +101,29 @@ public class EnhancedPacketHandler
+         Game.Managers.ShipGlowManager.SetGlow(shipSerial, on != 0);
+     }
+ 
++    /// <summary>
++    /// Server -> all clients: a ship part (serial) should be dyed to [hue] (0 = clear). The whole multi + its
++    /// components recolour to that hue while the pilot (who bought + applied that dye) has the helm. Rendered by
++    /// MultiView (by OwnerSerial) and ItemView (by Serial).
++    /// </summary>
++    private static void OnShipDyeState(ref StackDataReader p, int version)
++    {
++        uint shipSerial = p.ReadUInt32BE();
++        ushort hue = p.ReadUInt16BE();
++        Game.Managers.ShipDyeManager.SetDye(shipSerial, hue);
++    }
++
++    /// <summary>
++    /// Server -> all clients: a rider (serial) has mount dye [hue] (0 = clear). That player's mount (whatever they
++    /// ride) recolours to this hue for everyone. Rendered by MobileView (recolours only the mount).
++    /// </summary>
++    private static void OnMountDyeState(ref StackDataReader p, int version)
++    {
++        uint riderSerial = p.ReadUInt32BE();
++        ushort hue = p.ReadUInt16BE();
++        Game.Managers.MountDyeManager.SetDye(riderSerial, hue);
++    }
++
+     /// <summary>
+     /// Server -> all clients: a player's applied Store portrait (sp#) and portrait frame (pi#). Stored so the
+     /// target HUD can show them live when you target that player. Empty ids clear their entry.
+diff --git a/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedPacketTypeEnum.cs b/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedPacketTypeEnum.cs
+index 1f3530083..f8e987866 100644
+--- a/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedPacketTypeEnum.cs
++++ b/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedPacketTypeEnum.cs
+@@ -40,5 +40,9 @@ public enum EnhancedPacketType : ushort
+     ShipGlowState,          // server -> all: a ship (serial) glow on/off -> everyone sees the whole ship glow while it's piloted
+     StorePurchase,          // client -> server: a Store purchase (item id/name/price) -> server records it on the ACCOUNT (sync) + logs
+     StoreOwnedRequest,      // client -> server: send me my account's owned Store items (sync on Store open / world enter)
+-    StoreOwnedList          // server -> client: the account's owned Store item ids (comma-separated) -> merged into the profile
++    StoreOwnedList,         // server -> client: the account's owned Store item ids (comma-separated) -> merged into the profile
++    ShipDye,                // client -> server: a player's applied Store ship-dye HUE (0 = none; server decides on piloting)
++    ShipDyeState,           // server -> all: a ship part (serial) dye hue -> everyone sees the whole ship recoloured while piloted
++    MountDye,               // client -> server: a player's applied Store mount-dye HUE (0 = none) -> relayed to everyone
++    MountDyeState           // server -> all: a rider (serial) mount-dye hue -> everyone sees that player's mount recoloured
+ }
+-- 
+2.54.0.windows.1
+

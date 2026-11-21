@@ -1,0 +1,331 @@
+// Excerpt of MyShard-Client/src/ClassicUO.Client/Game/UI/Gumps/StoreGump.cs
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 47-81 -----
+   47|         // Header "MyShard Store" title: custom GWTwoFont, white with a black outline, 1.5x bigger (24 -> 36).
+   48|         private const string FONT_STORE_TITLE = "GWTwoFont";
+   49|         private const float TITLE_SIZE = 36f;
+   50|         private const int TITLE_X = 225;   // 20 + 205 (nudged right)
+   51| 
+   52|         private static readonly string[] CATEGORIES =
+   53|         {
+   54|             "Glow Effect",
+   55|             "Portrait",
+   56|             "Mount Dye",
+   57|             "Ship Dye",
+   58|             "Eternal Mounts",
+   59|             "Garden Cosmetics",
+   60|             "Premium",
+   61|             "Silver",
+   62|             "Gold",
+   63|         };
+   64| 
+   65|         // Logo drawn (original size) to the LEFT of each category label — index-matched to CATEGORIES.
+   66|         private static readonly string[] CAT_LOGOS =
+   67|         {
+   68|             "glow-logo.png",     // Glow Effect
+   69|             "potrait-logo.png",  // Portrait
+   70|             "mount-logo.png",    // Mount Dye
+   71|             "ship-logo.png",     // Ship Dye
+   72|             "mount-logo.png",    // Eternal Mounts
+   73|             "garden-logo.png",   // Garden Cosmetics
+   74|             "pre-logo.png",      // Premium
+   75|             "silver-logo.png",   // Silver
+   76|             "gold-logo.png",     // Gold
+   77|         };
+   78| 
+   79|         // Card grid.
+   80|         private const int CPAD = 18;
+   81|         private const int COLS = 3;
+
+// ----- lines 231-251 -----
+  231|             Add(new AlphaBlendControl(1f) { Y = H - FOOTER_H, Width = W, Height = 1, BaseColor = Divider, AcceptMouseInput = false });
+  232| 
+  233|             TextBox foot = TextBox.GetOne("Balance: 0 Silver", FONT_BODY, 15, TextMuted, TextBox.RTLOptions.Default());
+  234|             foot.X = 16;
+  235|             foot.Y = H - FOOTER_H + (FOOTER_H - foot.Height) / 2;
+  236|             Add(foot);
+  237|         }
+  238| 
+  239|         private void BuildCategoryPage(World world, int page, string catName)
+  240|         {
+  241|             // Glow Effect: sub-tabs Weapon / Mount / Ship / Portrait (Weapon shows the weapon-glow.gif product).
+  242|             if (catName == "Glow Effect")
+  243|             {
+  244|                 BuildGlowPage(world, page);
+  245|                 return;
+  246|             }
+  247| 
+  248|             // Portrait: two sub-tabs — "Portraits" (sp1..sp12 replace the HUD portrait) and "Portrait Frame"
+  249|             // (pi1..pi8 overlay a frame on top of the current portrait). Images shown at original size.
+  250|             if (catName == "Portrait")
+  251|             {
+
+// ----- lines 267-294 -----
+  267|                 return;
+  268|             }
+  269| 
+  270|             // Gold: Kredi'yi oyun-içi ALTIN (gp) ile satın alma — 3 paket.
+  271|             if (catName == "Gold")
+  272|             {
+  273|                 BuildGoldPage(world, page);
+  274|                 return;
+  275|             }
+  276| 
+  277|             // Ship Dye: her UO hue için bir kart (Buy -> Apply -> Default); apply -> pilotta tüm gemi o renge boyanır.
+  278|             if (catName == "Ship Dye")
+  279|             {
+  280|                 BuildShipDyePage(world, page);
+  281|                 return;
+  282|             }
+  283| 
+  284|             // Mount Dye: Ship Dye ile aynı — her UO hue için kart; apply -> bindiğin binek o renge boyanır (herkese).
+  285|             if (catName == "Mount Dye")
+  286|             {
+  287|                 BuildMountDyePage(world, page);
+  288|                 return;
+  289|             }
+  290| 
+  291|             const int usableW = W - LEFT_W - CPAD * 2 - 15;
+  292|             int cellW = (usableW - GAP * (COLS - 1)) / COLS;   // fit the columns to the content width
+  293| 
+  294|             // Garden Cosmetics: real UO item art cards (test). Card size stays standard; the item art is drawn
+
+// ----- lines 503-555 -----
+  503|                         GameActions.Print(world, $"[Store] {p.kredi} — {p.gp} ile satın alma.");
+  504|                     })
+  505|                 {
+  506|                     X = CPAD + i * (cellW + GAP),
+  507|                     Y = 16
+  508|                 };
+  509|                 _content.Content.Add(card, page);
+  510|             }
+  511|         }
+  512| 
+  513|         // Ship Dye kategorisi: verilen her UO hue için bir kart (Buy -> Apply -> Default), şimdilik görselsiz (boş).
+  514|         // Apply -> profildeki tek aktif dye hue set edilir + server'a push; pilota geçince tüm gemi o renge boyanır
+  515|         // (server broadcast, ShipDyeManager). Yeni renkler geldikçe hues dizisine eklenir.
+  516|         private void BuildShipDyePage(World world, int page)
+  517|         {
+  518|             ushort[] hues =
+  519|             {
+  520|                 1153, 1173, 1159, 1154, 1158, 1756, 1921, 1909, 1993,
+  521|                 1947, 1927, 1926, 1948, 1960, 1953, 1996, 1945, 2052, 2098, 2179, 2232, 2368, 2609,
+  522|             };
+  523|             int[] priceCycle = { 300, 450, 500, 650, 400, 550 };   // "rastgele" çeşitli Kredi fiyatları
+  524| 
+  525|             List<Control> cards = new List<Control>();
+  526|             for (int i = 0; i < hues.Length; i++)
+  527|             {
+  528|                 ushort hue = hues[i];   // döngü-yerel: closure doğru hue'yu yakalar
+  529|                 string code = hue.ToString("D4");   // 4-hane sıfır-dolgulu (784 -> 0784) — UO hue referansıyla eşleşsin
+  530|                 string id = "sd_" + code;
+  531|                 string title = "Ship Dye " + code;
+  532|                 string price = priceCycle[i % priceCycle.Length] + " Kredi";
+  533|                 cards.Add(new GlowToggleCard(world, null, title, price, id,
+  534|                     () => ApplyShipDye(world, hue),
+  535|                     () => RemoveShipDye(world),
+  536|                     () => IsShipDyeActive(hue),
+  537|                     15944, hue));   // önizleme: item 15944, karttaki hue'ya boyalı
+  538|             }
+  539| 
+  540|             LayoutGrid(cards, 16);
+  541|             foreach (Control c in cards)
+  542|                 _content.Content.Add(c, page);
+  543|         }
+  544| 
+  545|         // Mount Dye kategorisi: Ship Dye ile aynı (aynı hue listesi + Silver/Kredi), görsel olarak item 41565 karttaki
+  546|         // hue'ya boyalı gösterilir. Apply -> profildeki tek aktif mount-dye hue set edilir + server'a push (herkese
+  547|         // relay); oyuncu HERHANGİ bir bineğe binince o binek o renge boyanır (MobileView, yalnızca binek).
+  548|         private void BuildMountDyePage(World world, int page)
+  549|         {
+  550|             ushort[] hues =
+  551|             {
+  552|                 1153, 1173, 1159, 1154, 1158, 1756, 1921, 1909, 1993,
+  553|                 1947, 1927, 1926, 1948, 1960, 1953, 1996, 1945, 2052, 2098, 2179, 2232, 2368, 2609,
+  554|             };
+  555|             int[] priceCycle = { 300, 450, 500, 650, 400, 550 };
+
+// ----- lines 567-594 -----
+  567|                     () => RemoveMountDye(world),
+  568|                     () => IsMountDyeActive(hue),
+  569|                     41565, hue));   // önizleme: item 41565, karttaki hue'ya boyalı
+  570|             }
+  571| 
+  572|             LayoutGrid(cards, 16);
+  573|             foreach (Control c in cards)
+  574|                 _content.Content.Add(c, page);
+  575|         }
+  576| 
+  577|         // Glow Effect category: sub-tabs Weapon / Mount / Ship / Portrait. Weapon shows the animated weapon-glow.gif
+  578|         // product; the others are placeholder products for now.
+  579|         private void BuildGlowPage(World world, int page)
+  580|         {
+  581|             Color tabOn = new Color(56, 150, 66);
+  582|             Color tabOff = new Color(52, 56, 66);
+  583| 
+  584|             string[] tabNames = { "Weapon", "Mount", "Ship", "Portrait" };
+  585|             List<Control>[] groups = new List<Control>[tabNames.Length];
+  586|             RoundButton[] tabs = new RoundButton[tabNames.Length];
+  587|             for (int i = 0; i < groups.Length; i++) groups[i] = new List<Control>();
+  588| 
+  589|             void ShowTab(int active)
+  590|             {
+  591|                 for (int i = 0; i < tabs.Length; i++)
+  592|                 {
+  593|                     tabs[i].SetState(tabNames[i], i == active ? tabOn : tabOff);
+  594|                     foreach (Control c in groups[i]) c.IsVisible = (i == active);
+
+// ----- lines 628-653 -----
+  628|                 GifImage gif = wgBytes != null ? new GifImage("store:weapon-glow.gif", wgBytes) : null;
+  629|                 string wkey = key;
+  630|                 wepCards.Add(new GlowToggleCard(world, gif, title, "500 Silver", "wg_" + wkey,
+  631|                     () => ApplyWeaponGlow(world, wkey),
+  632|                     () => RemoveWeaponGlow(world, wkey),
+  633|                     () => IsWeaponGlowActive(wkey)));
+  634|             }
+  635|             LayoutGrid(wepCards, startY);
+  636|             foreach (Control c in wepCards) groups[0].Add(c);
+  637| 
+  638|             // Ship sub-tab (group 2): one glow card per ship type, each with its own gif drawn at ORIGINAL size
+  639|             // (the card grows to fit the gif and centres it). Same Buy -> Apply -> Default toggle as weapons.
+  640|             (string key, string title, string gif)[] ships =
+  641|             {
+  642|                 ("medium_dragon", "Medium Dragon Ship Glow Effect", "medi-ship.gif"),
+  643|                 ("large_dragon",  "Large Dragon Ship Glow Effect", "large-ship.gif"),
+  644|             };
+  645|             List<Control> shipCards = new List<Control>();
+  646|             foreach ((string key, string title, string gifFile) in ships)
+  647|             {
+  648|                 GifImage sgif = null;
+  649|                 if (PNGLoader.Instance.TryGetEmbeddedGif(gifFile, out byte[] sbytes) && sbytes != null)
+  650|                     sgif = new GifImage("store:" + gifFile, sbytes);
+  651|                 string skey = key;
+  652|                 shipCards.Add(new GlowToggleCard(world, sgif, title, "500 Silver", "sg_" + skey,
+  653|                     () => ApplyShipGlow(world, skey),
+
+// ----- lines 656-676 -----
+  656|             }
+  657|             LayoutGrid(shipCards, startY);
+  658|             foreach (Control c in shipCards) groups[2].Add(c);
+  659| 
+  660|             // Mount / Portrait sub-tabs: placeholder products for now.
+  661|             string[] phTitle = { null, "Mount Glow", null, "Portrait Glow" };
+  662|             int usableW = W - LEFT_W - CPAD * 2 - 15;
+  663|             int cellW = (usableW - GAP * (COLS - 1)) / COLS;
+  664|             for (int g = 1; g < tabNames.Length; g++)
+  665|             {
+  666|                 if (g == 2)   // Ship handled above
+  667|                     continue;
+  668|                 for (int i = 0; i < 3; i++)
+  669|                 {
+  670|                     int col = i % COLS, row = i / COLS;
+  671|                     groups[g].Add(new ProductCard(world, cellW, CARD_H, $"{phTitle[g]} #{i + 1}", "500 Silver")
+  672|                     { X = CPAD + col * (cellW + GAP), Y = startY + row * (CARD_H + GAP) });
+  673|                 }
+  674|             }
+  675| 
+  676|             for (int g = 0; g < groups.Length; g++)
+
+// ----- lines 897-941 -----
+  897|             Profile prof = ProfileManager.CurrentProfile;
+  898|             ushort mask = (ushort)(prof?.StoreWeaponGlowMask ?? 0);
+  899|             if (world?.Player != null)
+  900|                 WeaponGlowManager.SetMask(world.Player.Serial, mask);
+  901|             AsyncNetClient.Socket?.Send_WeaponGlow(mask);
+  902|         }
+  903| 
+  904|         // ---- ship glow (persistent bitmask; the glow only shows while PILOTING, driven by the server) ----
+  905|         private static bool IsShipGlowActive(string key)
+  906|         {
+  907|             int bit = ShipGlowManager.BitFor(key);
+  908|             Profile prof = ProfileManager.CurrentProfile;
+  909|             return bit >= 0 && prof != null && (prof.StoreShipGlowMask & (1 << bit)) != 0;
+  910|         }
+  911| 
+  912|         private static void ApplyShipGlow(World world, string key)
+  913|         {
+  914|             int bit = ShipGlowManager.BitFor(key);
+  915|             Profile prof = ProfileManager.CurrentProfile;
+  916|             if (bit < 0 || prof == null)
+  917|                 return;
+  918|             prof.StoreShipGlowMask |= (1 << bit);
+  919|             PushShipGlow(world);
+  920|             GameActions.Print(world, "[Store] Ship glow applied — board the ship and take the helm to see it.");
+  921|         }
+  922| 
+  923|         private static void RemoveShipGlow(World world, string key)
+  924|         {
+  925|             int bit = ShipGlowManager.BitFor(key);
+  926|             Profile prof = ProfileManager.CurrentProfile;
+  927|             if (bit < 0 || prof == null)
+  928|                 return;
+  929|             prof.StoreShipGlowMask &= ~(1 << bit);
+  930|             PushShipGlow(world);
+  931|             GameActions.Print(world, "[Store] Ship glow removed.");
+  932|         }
+  933| 
+  934|         // Publish my applied ship-glow bitmask to the server (it decides, on piloting, which ship glows for everyone).
+  935|         public static void PushShipGlow(World world)
+  936|         {
+  937|             Profile prof = ProfileManager.CurrentProfile;
+  938|             ushort mask = (ushort)(prof?.StoreShipGlowMask ?? 0);
+  939|             AsyncNetClient.Socket?.Send_ShipGlow(mask);
+  940|         }
+  941| 
+
+// ----- lines 946-976 -----
+  946|             return prof != null && hue != 0 && prof.StoreShipDyeHue == hue;
+  947|         }
+  948| 
+  949|         private static void ApplyShipDye(World world, ushort hue)
+  950|         {
+  951|             Profile prof = ProfileManager.CurrentProfile;
+  952|             if (prof == null || hue == 0)
+  953|                 return;
+  954|             prof.StoreShipDyeHue = hue;   // only ONE dye active at a time (applying replaces the previous)
+  955|             PushShipDye(world);
+  956|             GameActions.Print(world, "[Store] Ship dye applied — board the ship and take the helm to see it.");
+  957|         }
+  958| 
+  959|         private static void RemoveShipDye(World world)
+  960|         {
+  961|             Profile prof = ProfileManager.CurrentProfile;
+  962|             if (prof == null)
+  963|                 return;
+  964|             prof.StoreShipDyeHue = 0;
+  965|             PushShipDye(world);
+  966|             GameActions.Print(world, "[Store] Ship dye removed.");
+  967|         }
+  968| 
+  969|         // Publish my applied ship-dye hue to the server (it recolours the whole ship for everyone while I pilot). 0 = none.
+  970|         public static void PushShipDye(World world)
+  971|         {
+  972|             Profile prof = ProfileManager.CurrentProfile;
+  973|             ushort hue = (ushort)(prof?.StoreShipDyeHue ?? 0);
+  974|             AsyncNetClient.Socket?.Send_ShipDye(hue);
+  975|         }
+  976| 
+
+// ----- lines 1343-1363 -----
+ 1343|                 WantUpdateSize = false;
+ 1344| 
+ 1345|                 if (ok)
+ 1346|                 {
+ 1347|                     gif.X = _pad;
+ 1348|                     gif.Y = 8;
+ 1349|                     Add(gif);
+ 1350|                 }
+ 1351|                 else if (previewGraphic != 0)
+ 1352|                 {
+ 1353|                     // MyShard: UO item art önizlemesi (ör. Ship Dye), kartın hue'suna boyalı; görsel alanına ortalı.
+ 1354|                     // Oyuncu bu item'in rengiyle gemiyi hangi renge boyayacağını görür.
+ 1355|                     StaticPic pic = new StaticPic(previewGraphic, previewHue);
+ 1356|                     if (!pic.IsDisposed)
+ 1357|                     {
+ 1358|                         pic.AcceptMouseInput = false;
+ 1359|                         pic.X = _pad + (_imgW - pic.Width) / 2;
+ 1360|                         pic.Y = 8 + (_gifH - pic.Height) / 2;
+ 1361|                         Add(pic);
+ 1362|                     }
+ 1363|                 }

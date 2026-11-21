@@ -1,0 +1,48 @@
+// Excerpt of MyShard-Server/src/game/chars/CCharAct.cpp
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 2907-2927 -----
+ 2907| 				if ( ( dwTopMostContainerUID == UIDTop.GetPrivateUID() ) && ( dwTopContainerUID == dwTopContainerUID_ToCheck ) )
+ 2908| 				{
+ 2909| 					if ( pCharTop != nullptr )
+ 2910| 					{
+ 2911|                         fIsInOpenedContainer = true;
+ 2912| 						// probably a pickup check from pack if pCharTop != this?
+ 2913| 					}
+ 2914| 					else
+ 2915| 					{
+ 2916| 						CItem * pItemTop = dynamic_cast<CItem *>(pObjTop);
+ 2917| 						if ( pItemTop && (pItemTop->IsType(IT_SHIP_HOLD) || pItemTop->IsType(IT_SHIP_HOLD_LOCK)) && (pItemTop->GetTopPoint().GetRegion(REGION_TYPE_MULTI) == GetTopPoint().GetRegion(REGION_TYPE_MULTI)) )
+ 2918| 						{
+ 2919|                             fIsInOpenedContainer = true;
+ 2920| 						}
+ 2921| 						else if ( ptOpenedContainerPosition.GetDist( pObjTop->GetTopPoint() ) <= 3 )
+ 2922| 						{
+ 2923|                             fIsInOpenedContainer = true;
+ 2924| 						}
+ 2925| 					}
+ 2926| 				}
+ 2927| 			}
+
+// ----- lines 5084-5104 -----
+ 5084|                     Use_Item(pItem);
+ 5085|                 continue;
+ 5086| 
+ 5087|             case IT_MOONGATE:
+ 5088|             case IT_TELEPAD:
+ 5089|                 if (fStanding)
+ 5090|                     continue;
+ 5091|                 Use_MoonGate(pItem);
+ 5092|                 return TRIGRET_RET_DEFAULT;
+ 5093| 
+ 5094|             case IT_SHIP_PLANK:
+ 5095|             case IT_ROPE:
+ 5096|                 if (!fStanding && !IsStatFlag(STATF_HOVERING) && !pItem->IsAttr(ATTR_STATIC))
+ 5097|                 {
+ 5098|                     // Check if we can go out of the ship (in the same direction of plank)
+ 5099|                     //bool fFromShip = (nullptr != GetTopSector()->GetRegion(GetTopPoint(), REGION_TYPE_SHIP)); // always true
+ 5100|                     if (MoveToValidSpot(m_dirFace, g_Cfg.m_iMaxShipPlankTeleport, 1, true))
+ 5101|                     {
+ 5102|                         //pItem->SetTimeoutS(5);	// autoclose the plank behind us
+ 5103|                         return TRIGRET_RET_TRUE;
+ 5104|                     }

@@ -1,0 +1,26 @@
+// Excerpt of MyShard-Server/src/game/chars/CCharSkill.cpp
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 4084-4105 -----
+ 4084| 	if (pItem->IsContainer())
+ 4085| 	{
+ 4086| 		if ((g_Cfg.m_iTradeWindowSnooping == false) && (pItem->IsItemInTrade() == true))
+ 4087| 			return false;
+ 4088| 	}
+ 4089| 
+ 4090| 	if (!IsPriv(PRIV_GM))
+ 4091| 	{
+ 4092| 		switch (pItem->GetType())
+ 4093| 		{
+ 4094| 		case IT_SHIP_HOLD_LOCK:
+ 4095| 		case IT_SHIP_HOLD:
+ 4096| 			// Must be on board a ship to open the hatch.
+ 4097| 			ASSERT(m_pArea);
+ 4098| 			if (m_pArea->GetResourceID().GetObjUID() != pItem->m_uidLink.GetObjUID())
+ 4099| 			{
+ 4100| 				SysMessage(g_Cfg.GetDefaultMsg(DEFMSG_ITEMUSE_HATCH_FAIL));
+ 4101| 				return true;
+ 4102| 			}
+ 4103| 			break;
+ 4104| 		case IT_EQ_BANK_BOX:
+ 4105| 			// Some sort of cheater.

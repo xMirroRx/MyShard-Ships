@@ -1,0 +1,32 @@
+// Excerpt of MyShard-Server/src/game/clients/CClient.h
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 677-704 -----
+  677| 910 -- 3006276 -- Salvage All
+  678| 911 -- 3006277 -- Salvage Ingots
+  679| 912 -- 3006278 -- Salvage Cloth
+  680| 915 -- 1049594 -- Loyalty Rating
+  681| 918 -- 1115022 -- Open Titles Menu
+  682| 920 -- 1116069 -- Dismantle
+  683| 922 -- 1116072 -- Unload
+  684| 930 -- 1116589 -- Emergency Repairs
+  685| 931 -- 1116590 -- Permanent Repairs
+  686| 932 -- 1011071 -- Repair item
+  687| 933 -- 1116566 -- Ship Access
+  688| 934 -- 3006203 -- Set Security
+  689| 935 -- 1060700 -- Reset Security
+  690| 936 -- 1115557 -- Rename
+  691| 937 -- 1149575 -- Dry Dock
+  692| 938 -- 1116729 -- Move Tillerman
+  693| 939 -- 1150110 -- Abandon Ship
+  694| 940 -- 1149570 -- Ship Recall Rune
+  695| 941 -- 1115930 -- Unlink
+  696| 953 -- 1151948 -- Switch Mastery
+  697| 954 -- used for pet bladeweave
+  698| 955 -- used for pet bladeweave
+  699| 956 -- 1159295 -- Compare With Item In Slot
+  700| 957 -- 1159297 -- View Suit Stats With Item
+  701| 958 -- 1159296 -- View Suit Stats
+  702| 959 -- 1159319 -- Use Transparent Gump
+  703| 960 -- 1159396 -- Use Non-Transparent Gump
+  704| 961 -- 1159411 -- Add Description

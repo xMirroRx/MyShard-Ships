@@ -1,0 +1,114 @@
+// Excerpt of MyShard-Server/src/game/chars/CCharUse.cpp
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 1415-1470 -----
+ 1415| 				GetClientActive()->addPromptConsole(CLIMODE_PROMPT_NAME_SIGN, g_Cfg.GetDefaultMsg(DEFMSG_MSG_KEY_TARG_SIGN), pItemTarg->GetUID());
+ 1416| 			return true;
+ 1417| 		case IT_CONTAINER:
+ 1418| 			pItemTarg->SetType(IT_CONTAINER_LOCKED);
+ 1419| 			SysMessageDefault(DEFMSG_MSG_KEY_TARG_CONT_LOCK);
+ 1420| 			break;
+ 1421| 		case IT_CONTAINER_LOCKED:
+ 1422| 			pItemTarg->SetType(IT_CONTAINER);
+ 1423| 			SysMessageDefault(DEFMSG_MSG_KEY_TARG_CONT_ULOCK);
+ 1424| 			break;
+ 1425| 		case IT_SHIP_HOLD:
+ 1426| 			pItemTarg->SetType(IT_SHIP_HOLD_LOCK);
+ 1427| 			SysMessageDefault(DEFMSG_MSG_KEY_TARG_HOLD_LOCK);
+ 1428| 			break;
+ 1429| 		case IT_SHIP_HOLD_LOCK:
+ 1430| 			pItemTarg->SetType(IT_SHIP_HOLD);
+ 1431| 			SysMessageDefault(DEFMSG_MSG_KEY_TARG_HOLD_ULOCK);
+ 1432| 			break;
+ 1433| 		case IT_DOOR:
+ 1434| 		case IT_DOOR_OPEN:
+ 1435| 			pItemTarg->SetType(IT_DOOR_LOCKED);
+ 1436| 			SysMessageDefault(DEFMSG_MSG_KEY_TARG_DOOR_LOCK);
+ 1437| 			break;
+ 1438| 		case IT_DOOR_LOCKED:
+ 1439| 			pItemTarg->SetType(IT_DOOR);
+ 1440| 			SysMessageDefault(DEFMSG_MSG_KEY_TARG_DOOR_ULOCK);
+ 1441| 			break;
+ 1442| 		case IT_SHIP_TILLER:
+ 1443| 			if ( IsClientActive() )
+ 1444| 				GetClientActive()->addPromptConsole(CLIMODE_PROMPT_NAME_SHIP, g_Cfg.GetDefaultMsg(DEFMSG_MSG_SHIPNAME_PROMT), pItemTarg->GetUID());
+ 1445| 			return true;
+ 1446| 		case IT_SHIP_PLANK:
+ 1447| 			pItemTarg->Ship_Plank(false);	// just close it.
+ 1448| 			if ( pItemTarg->GetType() == IT_SHIP_SIDE_LOCKED )
+ 1449| 			{
+ 1450| 				pItemTarg->SetType(IT_SHIP_SIDE);
+ 1451| 				SysMessageDefault(DEFMSG_MSG_KEY_TARG_SHIP_ULOCK);
+ 1452| 				break;
+ 1453| 			}
+ 1454| 			// Then fall thru and lock it.
+ 1455| 		case IT_SHIP_SIDE:
+ 1456| 			pItemTarg->SetType(IT_SHIP_SIDE_LOCKED);
+ 1457| 			SysMessageDefault(DEFMSG_MSG_KEY_TARG_SHIP_LOCK);
+ 1458| 			break;
+ 1459| 		case IT_SHIP_SIDE_LOCKED:
+ 1460| 			pItemTarg->SetType(IT_SHIP_SIDE);
+ 1461| 			SysMessageDefault(DEFMSG_MSG_KEY_TARG_SHIP_ULOCK);
+ 1462| 			break;
+ 1463| 		default:
+ 1464| 			SysMessageDefault(DEFMSG_MSG_KEY_TARG_NOLOCK);
+ 1465| 			return false;
+ 1466| 	}
+ 1467| 
+ 1468| 	pItemTarg->Sound(0x049);
+ 1469| 	return true;
+ 1470| }
+
+// ----- lines 1805-1856 -----
+ 1805| 			FALLTHROUGH;
+ 1806| 		case IT_DOOR_OPEN:
+ 1807| 		case IT_DOOR:
+ 1808| 		{
+ 1809| 			bool fOpen = pItem->Use_DoorNew(fLink);
+ 1810| 			if (fLink || !fOpen)    // don't link if we are just closing the door
+ 1811| 				return true;
+ 1812| 		}
+ 1813| 			break;
+ 1814| 
+ 1815| 		case IT_SHIP_PLANK:
+ 1816| 		{
+ 1817| 			// Close the plank if I'm inside the ship
+ 1818| 			if (m_pArea->IsFlag(REGION_FLAG_SHIP) && (m_pArea->GetResourceID().GetObjUID() == pItem->m_uidLink.GetObjUID()))
+ 1819| 			{
+ 1820| 				if (pItem->m_itShipPlank.m_wSideType == IT_SHIP_SIDE_LOCKED && !ContentFindKeyFor(pItem))
+ 1821| 				{
+ 1822| 					SysMessageDefault(DEFMSG_ITEMUSE_SHIPSIDE);
+ 1823| 					return true;
+ 1824| 				}
+ 1825| 				return pItem->Ship_Plank(false);
+ 1826| 			}
+ 1827| 			else if (pItem->IsTopLevel())
+ 1828| 			{
+ 1829| 				// Teleport to plank if I'm outside the ship
+ 1830| 				CPointMap pntTarg = pItem->GetTopPoint();
+ 1831| 				++pntTarg.m_z;
+ 1832| 				Spell_Teleport(pntTarg, true, false, false);
+ 1833| 			}
+ 1834| 			return true;
+ 1835| 		}
+ 1836| 
+ 1837| 		case IT_SHIP_SIDE_LOCKED:
+ 1838| 			if (!IsPriv(PRIV_GM) && !ContentFindKeyFor(pItem))
+ 1839| 			{
+ 1840| 				SysMessageDefault(DEFMSG_ITEMUSE_SHIPSIDE);
+ 1841| 				return true;
+ 1842| 			}
+ 1843| 			FALLTHROUGH;
+ 1844| 		case IT_SHIP_SIDE:
+ 1845| 			// Open the plank
+ 1846| 			pItem->Ship_Plank(true);
+ 1847| 			return true;
+ 1848| 
+ 1849| 		case IT_GRAIN:
+ 1850| 		case IT_GRASS:
+ 1851| 		case IT_GARBAGE:
+ 1852| 		case IT_FRUIT:
+ 1853| 		case IT_FOOD:
+ 1854| 		case IT_FOOD_RAW:
+ 1855| 		case IT_MEAT_RAW:
+ 1856| 		{

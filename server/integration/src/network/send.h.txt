@@ -1,0 +1,101 @@
+// Excerpt of MyShard-Server/src/network/send.h
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 18-38 -----
+   18| struct CRectMap;
+   19| class CNetState;
+   20| class CItemMap;
+   21| class CObjBaseTemplate;
+   22| class CSpellDef;
+   23| class CItemContainer;
+   24| class CItemMessage;
+   25| class CItemCorpse;
+   26| class CCharRefArray;
+   27| class CItemMultiCustom;
+   28| class CItemShip;
+   29| class CClientTooltip;
+   30| 
+   31| 
+   32| // TODO: define the virtual destructor of each class with virtual methods in the .cpp file.
+   33| //  Not doing that makes the compiler emit the virtual table (vtable) in every translation unit, instead
+   34| //  of having that only in one .cpp file (translation unit) -> the one file where we define the destructor or at least one virtual method.
+   35| #ifdef __clang__
+   36|     #pragma GCC diagnostic push
+   37|     #pragma GCC diagnostic ignored "-Wweak-vtables"
+   38| #endif
+
+// ----- lines 1662-1705 -----
+ 1662|  ***************************************************************************/
+ 1663| class PacketWeaponGlow : public PacketSend
+ 1664| {
+ 1665| public:
+ 1666| 	PacketWeaponGlow(const CClient* target, dword serial, word mask);
+ 1667| };
+ 1668| 
+ 1669| /***************************************************************************
+ 1670|  *
+ 1671|  *
+ 1672|  *	Packet 0xCE : PacketShipGlowState	(custom) MyShard: a ship (serial) glow on/off, sent to every online player
+ 1673|  *										so the whole ship lights up while its pilot (who applied the glow) has the helm.
+ 1674|  *
+ 1675|  *
+ 1676|  ***************************************************************************/
+ 1677| class PacketShipGlowState : public PacketSend
+ 1678| {
+ 1679| public:
+ 1680| 	PacketShipGlowState(const CClient* target, dword shipSerial, byte on);
+ 1681| };
+ 1682| 
+ 1683| /***************************************************************************
+ 1684|  *
+ 1685|  *
+ 1686|  *	Packet 0xCE : PacketShipDyeState	(custom) MyShard: a ship part (serial) dye HUE, sent to every online
+ 1687|  *										player so the whole ship recolours while its pilot (who applied the dye)
+ 1688|  *										has the helm. hue 0 = clear the dye.
+ 1689|  *
+ 1690|  *
+ 1691|  ***************************************************************************/
+ 1692| class PacketShipDyeState : public PacketSend
+ 1693| {
+ 1694| public:
+ 1695| 	PacketShipDyeState(const CClient* target, dword shipSerial, word hue);
+ 1696| };
+ 1697| 
+ 1698| /***************************************************************************
+ 1699|  *
+ 1700|  *
+ 1701|  *	Packet 0xCE : PacketMountDyeState	(custom) MyShard: a rider (serial) mount-dye HUE, sent to every online
+ 1702|  *										player so that player's mount recolours for everyone. hue 0 = clear.
+ 1703|  *
+ 1704|  *
+ 1705|  ***************************************************************************/
+
+// ----- lines 2529-2556 -----
+ 2529| public:
+ 2530| 	PacketDisplayMapNew(const CClient* target, const CItemMap* map, const CRectMap& rect);
+ 2531| 
+ 2532|     virtual bool canSendTo(const CNetState* state) const override { return CanSendTo(state); }
+ 2533|     static bool CanSendTo(const CNetState* state);
+ 2534| };
+ 2535| 
+ 2536| /***************************************************************************
+ 2537|  *
+ 2538|  *
+ 2539|  *	Packet 0xF6 : PacketMoveShip			move ship (NORMAL)
+ 2540|  *
+ 2541|  *
+ 2542|  ***************************************************************************/
+ 2543| class PacketMoveShip : public PacketSend
+ 2544| {
+ 2545| public:
+ 2546| 	PacketMoveShip(const CClient* target, const CObjBase* movingObj, CObjBase** objects, uint objectCount, byte movedirection, byte boatdirection, byte speed);
+ 2547| };
+ 2548| 
+ 2549| /***************************************************************************
+ 2550|  *
+ 2551|  *
+ 2552|  *	Packet 0xF7 : PacketContainer			multiple packets (NORMAL)
+ 2553|  *
+ 2554|  *
+ 2555|  ***************************************************************************/
+ 2556| class PacketContainer : public PacketSend

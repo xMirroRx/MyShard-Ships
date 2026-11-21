@@ -1,0 +1,17 @@
+// Excerpt of MyShard-Client/src/ClassicUO.Client/Network/PacketHandlers/CustomHouse.cs
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 100-112 -----
+  100|             world.CustomHouseManager.GenerateFloorPlace();
+  101| 
+  102|             UIManager.GetGump<HouseCustomizationGump>(house.Serial)?.Update();
+  103|         }
+  104| 
+  105|         UIManager.GetGump<MiniMapGump>()?.RequestUpdateContents();
+  106| 
+  107|         if (world.HouseManager.EntityIntoHouse(serial, world.Player))
+  108|             Client.Game.GetScene<GameScene>()?.UpdateMaxDrawZ(true);
+  109| 
+  110|         world.BoatMovingManager.ClearSteps(serial);
+  111|     }
+  112| }

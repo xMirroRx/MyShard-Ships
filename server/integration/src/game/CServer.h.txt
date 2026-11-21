@@ -1,0 +1,25 @@
+// Excerpt of MyShard-Server/src/game/CServer.h
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 9-29 -----
+    9| #include "../common/sqlite/SQLite.h"
+   10| #include "../common/CSFileObj.h"
+   11| #include "../common/CTextConsole.h"
+   12| #include "../common/CDataBase.h"
+   13| #include "../sphere/ConsoleInterface.h"
+   14| #include "clients/CChat.h"
+   15| #include "CServerDef.h"
+   16| #include <atomic>
+   17| 
+   18| 
+   19| class CItemShip;
+   20| 
+   21| enum class ServMode
+   22| {
+   23|     RestockAll,             // Major event, potentially slow.
+   24|     GarbageCollection,      // Executing the garbage collection, potentially demanding.
+   25|     Saving,                 // Forced save freezes the system.
+   26|     Run,                    // Game is up and running.
+   27|     ResyncPause,            // Server paused during resync.
+   28| 
+   29|     StartupPreLoadingIni,   // Initial (first) parsing of the sphere.ini

@@ -1,0 +1,193 @@
+From 39b6455ffce4cb9ec619db0ed7ea8106b81f90e7 Mon Sep 17 00:00:00 2001
+From: xMirroRx <xMirroRx@users.noreply.github.com>
+Date: Tue, 29 Sep 2026 22:44:40 +0300
+Subject: [PATCH] Combat HUD, cast auras, self-silence skill bar, boat walking
+ fix
+
+- Status window: 13 STATUSEXTRA values incl. buffed PvP/PvM stats and min/max damage, 500 ms refresh
+- Skill bar: separate own self-silence from enemy silence; Cleanse allowed under enemy CC
+- Cast auras for cast-time abilities, also drawn for other players' casts
+- Boat: shift the local player by the boat delta instead of snapping to the server position
+- HUD rescale, top bar centered, debug stats font, AltGr lock, gather corpses, ScrollSay packet
+- Updated ExternalImages
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/ClassicUO.Client/Game/GameObjects/Item.cs | 16 ++++
+ .../Game/Managers/BoatMovingManager.cs        | 91 ++++++++++++++++++-
+ 2 files changed, 103 insertions(+), 4 deletions(-)
+
+diff --git a/src/ClassicUO.Client/Game/GameObjects/Item.cs b/src/ClassicUO.Client/Game/GameObjects/Item.cs
+index 4603f24eb..45c7a9ac0 100644
+--- a/src/ClassicUO.Client/Game/GameObjects/Item.cs
++++ b/src/ClassicUO.Client/Game/GameObjects/Item.cs
+@@ -84,6 +84,22 @@ namespace ClassicUO.Game.GameObjects
+         public bool IsCorpse => /*MathHelper.InRange(Graphic, 0x0ECA, 0x0ED2) ||*/
+             Graphic == 0x2006;
+ 
++        // The server marks gather corpses with both protocol hue flag bits.
++        // The marker is stripped in FixHue so it never changes the corpse's appearance.
++        public bool SuppressAutomaticCorpseOpen { get; private set; }
++
++        public override void FixHue(ushort hue)
++        {
++            SuppressAutomaticCorpseOpen = IsCorpse && (hue & 0xC000) == 0xC000;
++
++            if (SuppressAutomaticCorpseOpen)
++            {
++                hue &= 0x3FFF;
++            }
++
++            base.FixHue(hue);
++        }
++
+         public bool IsHumanCorpse => IsCorpse &&
+             MathHelper.InRange(Amount, 0x0190, 0x0193) ||
+             MathHelper.InRange(Amount, 0x00B7, 0x00BA) ||
+diff --git a/src/ClassicUO.Client/Game/Managers/BoatMovingManager.cs b/src/ClassicUO.Client/Game/Managers/BoatMovingManager.cs
+index 87dcc61a3..c023db4a3 100644
+--- a/src/ClassicUO.Client/Game/Managers/BoatMovingManager.cs
++++ b/src/ClassicUO.Client/Game/Managers/BoatMovingManager.cs
+@@ -44,6 +44,43 @@ namespace ClassicUO.Game.Managers
+             }
+         }
+ 
++        // MyShard: the local player aboard a moving boat is carried by the boat's DELTA, never snapped to the absolute
++        // position in the boat packet. That position is the server's view at send time and does not include steps the
++        // player walked on deck that the server hasn't confirmed yet; snapping (and the walker reset that came with it)
++        // threw the player back each boat step — walking on a moving ship stuttered. The pending walk steps (Walker
++        // StepInfos) and the walk animation targets (Steps) are shifted by the same delta so they stay consistent.
++        public void ShiftPlayer(int dx, int dy, int dz)
++        {
++            PlayerMobile p = _world.Player;
++            if (p == null || (dx == 0 && dy == 0 && dz == 0))
++                return;
++
++            p.X = (ushort)(p.X + dx);
++            p.Y = (ushort)(p.Y + dy);
++            p.Z = (sbyte)(p.Z + dz);
++            p.UpdateScreenPosition();
++            p.AddToTile();
++
++            for (int i = 0; i < p.Steps.Count; i++)
++            {
++                ref Mobile.Step s = ref p.Steps.GetAt(i);
++                s.X += dx;
++                s.Y += dy;
++                s.Z = (sbyte)(s.Z + dz);
++            }
++
++            for (int i = 0; i < p.Walker.StepsCount; i++)
++            {
++                ref StepInfo si = ref p.Walker.StepInfos[i];
++                si.X = (ushort)(si.X + dx);
++                si.Y = (ushort)(si.Y + dy);
++                si.Z = (sbyte)(si.Z + dz);
++            }
++
++            _world.RangeSize.X += dx;
++            _world.RangeSize.Y += dy;
++        }
++
+         public void MoveRequest(Direction direciton, byte speed)
+         {
+             AsyncNetClient.Socket.Send_MultiBoatMoveRequest(_world.Player, direciton, speed);
+@@ -118,7 +155,6 @@ namespace ClassicUO.Game.Managers
+ 
+             ClearEntities(serial);
+             _timePacket = Time.Ticks;
+-            Console.WriteLine("CURRENT PACKET TIME: {0}", _timePacket);
+         }
+ 
+         public void ClearSteps(uint serial)
+@@ -253,6 +289,10 @@ namespace ClassicUO.Game.Managers
+ 
+                     if (removeStep)
+                     {
++                        int dx = step.X - item.X;
++                        int dy = step.Y - item.Y;
++                        int dz = step.Z - item.Z;
++
+                         item.X = step.X;
+                         item.Y = step.Y;
+                         item.Z = step.Z;
+@@ -279,7 +319,10 @@ namespace ClassicUO.Game.Managers
+                             step.X,
+                             step.Y,
+                             step.Z,
+-                            step.MovingDir
++                            step.MovingDir,
++                            dx,
++                            dy,
++                            dz
+                         );
+ 
+                         item.LastStepTime = Time.Ticks;
+@@ -301,7 +344,10 @@ namespace ClassicUO.Game.Managers
+                             item.X,
+                             item.Y,
+                             item.Z,
+-                            step.MovingDir
++                            step.MovingDir,
++                            0,
++                            0,
++                            0
+                         );
+                     }
+ 
+@@ -332,7 +378,10 @@ namespace ClassicUO.Game.Managers
+             int x,
+             int y,
+             int z,
+-            Direction direction
++            Direction direction,
++            int dx,
++            int dy,
++            int dz
+         )
+         {
+             if (_items.TryGetValue(serial, out FastList<ItemInside> list))
+@@ -355,6 +404,40 @@ namespace ClassicUO.Game.Managers
+ 
+                     //entity.BoatDirection = direction;
+ 
++                    // The local player is carried by the boat's delta (see ShiftPlayer); while he walks on deck his own
++                    // walk animation offset is kept instead of the boat's interpolation offset.
++                    if (entity == _world.Player)
++                    {
++                        if (removeStep)
++                        {
++                            ShiftPlayer(dx, dy, dz);
++                            if (_world.Player.Steps.Count == 0)
++                            {
++                                entity.Offset.X = 0;
++                                entity.Offset.Y = 0;
++                                entity.Offset.Z = 0;
++                            }
++                        }
++                        else if (item != null)
++                        {
++                            if (_world.Player.Steps.Count == 0)
++                            {
++                                entity.Offset = item.Offset;
++                            }
++                            else
++                            {
++                                // Walking on deck: World.Update already set this frame's walk-animation offset; add the
++                                // boat's glide on top so the player moves with the ship instead of lagging and then
++                                // jumping a tile when the boat step completes.
++                                entity.Offset.X += item.Offset.X;
++                                entity.Offset.Y += item.Offset.Y;
++                                entity.Offset.Z += item.Offset.Z;
++                            }
++                        }
++
++                        continue;
++                    }
++
+                     if (removeStep)
+                     {
+                         entity.X = (ushort) (x - it.X);
+-- 
+2.54.0.windows.1
+

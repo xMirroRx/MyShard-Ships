@@ -1,0 +1,26 @@
+// Excerpt of MyShard-Server/src/game/CObjBase.h
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 1015-1036 -----
+ 1015|     ITRIG_GetHit,               // Triggers when this clothing part get hit from characters.
+ 1016|     ITRIG_Hit,                  // Triggers when this item used to make a damage on characters.
+ 1017|     ITRIG_LEVEL,
+ 1018| 	ITRIG_MemoryEquip,          // I'm a memory and I'm being equiped.
+ 1019| 	ITRIG_PICKUP_GROUND,        // I'm being picked up from ground.
+ 1020| 	ITRIG_PICKUP_PACK,          // picked up from inside some container.
+ 1021| 	ITRIG_PICKUP_SELF,          // picked up from this container
+ 1022| 	ITRIG_PICKUP_STACK,         // picked up from a stack (ARGO)
+ 1023|     ITRIG_PreSpawn,             // Called before something is spawned, pre-check it's id and validity.
+ 1024|     ITRIG_Redeed,               // Redeeding a multi.
+ 1025|     ITRIG_RegionEnter,          // Ship entering a new region.
+ 1026|     ITRIG_RegionLeave,          // Ship leaving the region.
+ 1027|     ITRIG_ResourceGather,
+ 1028|     ITRIG_ResourceTest,
+ 1029| 	ITRIG_Sell,                 // I'm being sold.
+ 1030| 	ITRIG_Ship_Move,            // I'm a ship and i'm move around.
+ 1031|     ITRIG_Ship_Stop,            // I'm a ship and i'm stop around.
+ 1032| 	ITRIG_Ship_Turn,            // I'm a ship and i'm turning around.
+ 1033|     ITRIG_Smelt,                // I'm going to be smelt.
+ 1034|     ITRIG_Spawn,                // This spawn is going to generate something.
+ 1035| 	ITRIG_SPELLEFFECT,          // cast some spell on me.
+ 1036|     ITRIG_Start,                // Start trigger, right now used only on Champions.

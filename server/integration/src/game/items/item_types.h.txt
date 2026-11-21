@@ -1,0 +1,76 @@
+// Excerpt of MyShard-Server/src/game/items/item_types.h
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 56-80 -----
+   56| 	IT_MOONGATE,			// 39 = linked to other moon gates (hard coded locations)
+   57| 	IT_UNUSED_40,			// 40 =This was typedef t_chair (Any sort of a chair item. we can sit on.)
+   58| 	IT_FORGE,				// 41 = used to smelt ore, blacksmithy etc.
+   59| 	IT_ORE,					// 42 = smelt to ingots.
+   60| 	IT_LOG,					// 43 = make into furniture etc. lumber,logs,
+   61| 	IT_TREE,				// 44 = can be chopped.
+   62| 	IT_ROCK,				// 45 = can be mined for ore.
+   63| 	IT_CARPENTRY_CHOP,		// 46 = tool of some sort.
+   64| 	IT_MULTI,				// 47 = multi part object like house or ship.
+   65| 	IT_REAGENT,				// 48
+   66| 	IT_SHIP,				// 49 = this is a SHIP MULTI
+   67| 	IT_SHIP_PLANK,			// 50
+   68| 	IT_SHIP_SIDE,			// 51 = Should extend to make a plank
+   69| 	IT_SHIP_SIDE_LOCKED,	// 52
+   70| 	IT_SHIP_TILLER,			// 53 = Tiller man on the ship.
+   71| 	IT_EQ_TRADE_WINDOW,		// 54 = container for the trade window.
+   72| 	IT_FISH,				// 55 = fish can be cut up.
+   73| 	IT_SIGN_GUMP,			// 56 = Things like grave stones and sign plaques
+   74| 	IT_STONE_GUILD,			// 57 = Guild stones
+   75| 	IT_ANIM_ACTIVE,			// 58 = active anium that will recycle when done.
+   76| 	IT_SAND,				// 59 = sand
+   77| 	IT_CLOTH,				// 60 = bolt or folded cloth
+   78| 	IT_HAIR,				// 61
+   79| 	IT_BEARD,				// 62 = just for grouping purposes.
+   80| 	IT_INGOT,				// 63 = Ingot of some type made from IT_ORE.
+
+// ----- lines 112-132 -----
+  112| 	IT_EQ_NPC_SCRIPT,		// [OFF] 95 = Script npc actions in the form of a book.
+  113| 	IT_WEB,					// 96 = walk on this and transform into some other object. (stick to it)
+  114| 	IT_GRASS,				// 97 = can be eaten by grazing animals
+  115| 	IT_AROCK,				// 98 = a rock or boulder. can be thrown by giants.
+  116| 	IT_TRACKER,				// 99 = points to a linked object.
+  117| 	IT_SOUND,				// 100 = this is a sound source.
+  118| 	IT_STONE_TOWN,			// 101 = Town stones. everyone free to join.
+  119| 	IT_WEAPON_MACE_CROOK,	// 102
+  120| 	IT_WEAPON_MACE_PICK,	// 103
+  121| 	IT_LEATHER,				// 104 = Leather or skins of some sort.(not wearable)
+  122| 	IT_SHIP_OTHER,			// 105 = some other part of a ship.
+  123| 	IT_BBOARD,				// 106 = a container and bboard object.
+  124| 	IT_SPELLBOOK,			// 107 = spellbook (with spells)
+  125| 	IT_CORPSE,				// 108 = special type of item.
+  126| 	IT_TRACK_ITEM,			// 109 - track a id or type of item.
+  127| 	IT_TRACK_CHAR,			// 110 = track a char or range of char id's
+  128| 	IT_WEAPON_ARROW,		// 111
+  129| 	IT_WEAPON_BOLT,			// 112
+  130| 	IT_EQ_VENDOR_BOX,		// 113 = an equipped vendor .
+  131| 	IT_EQ_BANK_BOX,			// 114 = an equipped bank box
+  132| 	IT_DEED,				// 115
+
+// ----- lines 184-205 -----
+  184| 	IT_POTION_EMPTY,		// 167 = empty bottle.
+  185| 	IT_MORTAR,				// 168
+  186| 	IT_HAIR_DYE,			// 169
+  187| 	IT_SEWING_KIT,			// 170
+  188| 	IT_TINKER_TOOLS,		// 171
+  189| 	IT_WALL,				// 172 = wall of a structure.
+  190| 	IT_WINDOW,				// 173 = window for a structure.
+  191| 	IT_COTTON,				// 174 = Cotton from the plant
+  192| 	IT_BONE,				// 175
+  193| 	IT_EQ_SCRIPT,			// 176
+  194| 	IT_SHIP_HOLD,			// 177 = ships hold.
+  195| 	IT_SHIP_HOLD_LOCK,		// 178
+  196| 	IT_LAVA,				// 179
+  197| 	IT_SHIELD,				// 180 = equippable armor.
+  198| 	IT_JEWELRY,				// 181 = equippable.
+  199| 	IT_DIRT,				// 182 = a patch of dirt where i can plant something
+  200| 	IT_SCRIPT,				// 183 = Scriptable item (but not equippable)
+  201| 	IT_SPELLBOOK_NECRO,		// 184 = AOS Necromancy spellbook (should have MOREZ=100 by default)
+  202| 	IT_SPELLBOOK_PALA,		// 185 = AOS Paladin spellbook (should have MOREZ=200 by default)
+  203| 	IT_SPELLBOOK_EXTRA,		// 186 = some spellbook for script purposes
+  204| 	IT_SPELLBOOK_BUSHIDO,	// 187 = SE Bushido spellbook (should have MOREZ=400 by default)
+  205| 	IT_SPELLBOOK_NINJITSU,	// 188 = SE Ninjitsu spellbook (should have MOREZ=500 by default)

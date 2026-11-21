@@ -1,0 +1,53 @@
+// Excerpt of MyShard-Client/src/ClassicUO.Client/Game/GameObjects/Views/MultiView.cs
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 65-85 -----
+   65| 
+   66|             ushort graphic = Graphic;
+   67|             bool partial = ItemData.IsPartialHue;
+   68| 
+   69|             // MyShard: Store ship DYE — if this component belongs to a ship the pilot dyed, recolour the tile to that
+   70|             // hue (full hue, not partial). Special states below (highlight / out-of-range / dead) still override it.
+   71|             // Hue == 0 guard: only recolour parts that DON'T already carry a colour, so the ship's Hits (green) /
+   72|             // Mana (blue) status bars keep their own colour instead of being dyed.
+   73|             if (OwnerSerial != 0 && Hue == 0)
+   74|             {
+   75|                 ushort shipDye = ClassicUO.Game.Managers.ShipDyeManager.GetDye(OwnerSerial);
+   76|                 if (shipDye != 0)
+   77|                 {
+   78|                     hue = shipDye;
+   79|                     partial = false;
+   80|                 }
+   81|             }
+   82| 
+   83|             Profile currentProfile = ProfileManager.CurrentProfile;
+   84| 
+   85|             if (currentProfile.HighlightGameObjects && SelectedObject.Object == this)
+
+// ----- lines 105-130 -----
+  105|                 hueVec.Z *= 0.5f;
+  106|             }
+  107| 
+  108|             posX += (int)Offset.X;
+  109|             posY += (int)(Offset.Y + Offset.Z);
+  110| 
+  111|             DrawStaticAnimated(batcher, graphic, posX, posY, hueVec, false, depth, outlineColor: OutlineColor);
+  112| 
+  113|             // MyShard: Store ship glow — if this component belongs to a ship whose glow is active (its pilot bought +
+  114|             // applied it), redraw the tile ADDITIVELY in a single bright hue that breathes, so the whole ship glows.
+  115|             if (OwnerSerial != 0 && ClassicUO.Game.Managers.ShipGlowManager.IsGlowing(OwnerSerial))
+  116|             {
+  117|                 float glowPhase = (float)(ClassicUO.Time.Ticks % 1300) / 1300f;
+  118|                 float glowWave = 0.5f + 0.5f * (float)System.Math.Sin(glowPhase * System.Math.PI * 2.0);   // 0..1
+  119|                 float glowInt = 0.20f + 0.30f * glowWave;                                                   // breathing intensity (~1.5x softer)
+  120|                 Vector3 glowVec = ShaderHueTranslator.GetHueVector(ClassicUO.Game.Managers.ShipGlowManager.GlowHue, false, glowInt, false, true);
+  121| 
+  122|                 batcher.SetBlendState(Microsoft.Xna.Framework.Graphics.BlendState.Additive);
+  123|                 DrawStaticAnimated(batcher, graphic, posX, posY, glowVec, false, depth);
+  124|                 batcher.SetBlendState(null);
+  125|             }
+  126| 
+  127|             if (ItemData.IsLight)
+  128|             {
+  129|                 Client.Game.GetScene<GameScene>().AddLight(this, this, posX + 22, posY + 22);
+  130|             }

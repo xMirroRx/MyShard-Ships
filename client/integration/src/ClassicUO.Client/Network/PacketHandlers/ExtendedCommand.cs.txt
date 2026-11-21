@@ -1,0 +1,25 @@
+// Excerpt of MyShard-Client/src/ClassicUO.Client/Network/PacketHandlers/ExtendedCommand.cs
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 422-442 -----
+  422| 
+  423|                 if (
+  424|                     !world.HouseManager.TryGetHouse(serial, out House house)
+  425|                     || !house.IsCustom
+  426|                     || house.Revision != revision
+  427|                 )
+  428|                     SharedStore.AddCustomHouseRequest(serial);
+  429|                 else
+  430|                 {
+  431|                     house.Generate();
+  432|                     world.BoatMovingManager.ClearSteps(serial);
+  433| 
+  434|                     UIManager.GetGump<MiniMapGump>()?.RequestUpdateContents();
+  435| 
+  436|                     if (world.HouseManager.EntityIntoHouse(serial, world.Player))
+  437|                         Client.Game.GetScene<GameScene>()?.UpdateMaxDrawZ(true);
+  438|                 }
+  439| 
+  440|                 break;
+  441| 
+  442|             //===========================================================================================

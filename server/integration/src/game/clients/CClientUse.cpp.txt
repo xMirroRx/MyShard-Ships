@@ -1,0 +1,119 @@
+// Excerpt of MyShard-Server/src/game/clients/CClientUse.cpp
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 1-21 -----
+    1| 
+    2| #include "../../common/resource/CResourceLock.h"
+    3| #include "../../common/sphere_library/CSRand.h"
+    4| //#include "../../common/CExpression.h" // included in the precompiled header
+    5| //#include "../../common/CScriptParserBufs.h" // included in the precompiled header via CExpression.h
+    6| #include "../../common/CLog.h"
+    7| #include "../../network/send.h"
+    8| #include "../chars/CChar.h"
+    9| #include "../items/CItemCorpse.h"
+   10| #include "../items/CItemMap.h"
+   11| #include "../items/CItemShip.h"
+   12| #include "../components/CCSpawn.h"
+   13| #include "../CWorldMap.h"
+   14| #include "../CWorldSearch.h"
+   15| #include "../triggers.h"
+   16| #include "CClient.h"
+   17| 
+   18| bool CClient::Cmd_Use_Item( CItem *pItem, bool fTestTouch, bool fScript )
+   19| {
+   20| 	ADDTOCALLSTACK("CClient::Cmd_Use_Item");
+   21| 	// Assume we can see the target.
+
+// ----- lines 66-86 -----
+   66| 						if ( (dwTopMostContainerUID == pObjTop->GetUID().GetPrivateUID()) && (dwTopContainerUID == dwTopContainerUID_ToCheck) )
+   67| 						{
+   68| 							if ( pObjTop->IsChar() )
+   69| 							{
+   70| 								// probably a pickup check from pack if pCharTop != this?
+   71| 								isInOpenedContainer = true;
+   72| 							}
+   73| 							else
+   74| 							{
+   75| 								const CItem *pItemTop = static_cast<const CItem *>(pObjTop);
+   76| 								if ( pItemTop && (pItemTop->IsType(IT_SHIP_HOLD) || pItemTop->IsType(IT_SHIP_HOLD_LOCK)) && (pItemTop->GetTopPoint().GetRegion(REGION_TYPE_MULTI) == m_pChar->GetTopPoint().GetRegion(REGION_TYPE_MULTI)) )
+   77| 									isInOpenedContainer = true;
+   78| 								else if ( ptOpenedContainerPosition.GetDist(pObjTop->GetTopPoint()) <= 3 )
+   79| 									isInOpenedContainer = true;
+   80| 							}
+   81| 						}
+   82| 					}
+   83| 				}
+   84| 
+   85| 				if ( !isInOpenedContainer )
+   86| 				{
+
+// ----- lines 185-222 -----
+  185| 				if (!IsPriv(PRIV_GM))
+  186| 					return false;
+  187| 			}
+  188| 			else // I have the key but i need to use it to unlock the container.
+  189| 			{
+  190| 				SysMessageDefault(DEFMSG_LOCK_HAS_KEY);
+  191| 				return false;
+  192| 			}
+  193| 			break;
+  194| 
+  195| 		case IT_SHIP_HOLD_LOCK:
+  196| 			SysMessageDefault(DEFMSG_ITEMUSE_LOCKED);
+  197| 			if ( !m_pChar->GetPackSafe()->ContentFindKeyFor(pItem) ) // I don't have the hold key
+  198| 			{
+  199| 
+  200| 				SysMessageDefault(DEFMSG_LOCK_HOLD_NO_KEY);
+  201| 				if ( !IsPriv(PRIV_GM) )
+  202| 					return false;
+  203| 			}
+  204| 			else // I have the key but i need to use it to unlock the container.
+  205| 			{
+  206| 				SysMessageDefault(DEFMSG_LOCK_HAS_KEY);
+  207| 				return false;
+  208| 			}
+  209| 			break;
+  210| 
+  211| 		case IT_CORPSE:
+  212| 		case IT_SHIP_HOLD:
+  213| 		case IT_CONTAINER:
+  214| 		case IT_TRASH_CAN:
+  215| 		{
+  216| 			CItemContainer *pPack = static_cast<CItemContainer *>(pItem);
+  217| 
+  218| 			if ( !m_pChar->Skill_Snoop_Check(pPack) )
+  219| 			{
+  220| 				if ( !addContainerSetup(pPack) )
+  221| 					return false;
+  222| 			}
+
+// ----- lines 325-353 -----
+  325| 		}
+  326| 
+  327| 		case IT_SHRINE:
+  328| 		{
+  329| 			if ( m_pChar->OnSpellEffect(SPELL_Resurrection, m_pChar, 1000, pItem) )
+  330| 				return true;
+  331| 			SysMessageDefault(DEFMSG_ITEMUSE_SHRINE);
+  332| 			return true;
+  333| 		}
+  334| 
+  335| 		case IT_SHIP_TILLER:
+  336| 		{
+  337| 			if (m_net->isClientVersionNumber(MINCLIVER_HS))
+  338| 			{
+  339| 				CItemShip* pShip = dynamic_cast<CItemShip*>(pItem->m_uidLink.ItemFind());
+  340| 				if (pShip)
+  341| 				{
+  342| 					if (m_pChar->ContentFindKeyFor(pItem) || pShip->GetOwner() == m_pChar->GetUID())
+  343| 						pShip->CCMultiMovable::SetPilot(m_pChar);
+  344| 					else
+  345| 						pItem->Speak(g_Cfg.GetDefaultMsg(DEFMSG_TILLER_NOTYOURSHIP));
+  346| 					return true;
+  347| 				}
+  348| 			}
+  349| 			pItem->Speak(g_Cfg.GetDefaultMsg(DEFMSG_ITEMUSE_TILLERMAN), HUE_TEXT_DEF, TALKMODE_SAY, FONT_NORMAL);
+  350| 			return true;
+  351| 		}
+  352| 		case IT_WAND:
+  353| 		case IT_SCROLL:

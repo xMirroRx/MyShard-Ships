@@ -1,0 +1,25 @@
+// Excerpt of MyShard-Client/src/ClassicUO.Client/Configuration/Profile.cs
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 324-344 -----
+  324| 
+  325|         // MyShard Store purchase history: comma-separated item ids (e.g. "sp1,pi3,..."). Persisted so a player's
+  326|         // purchases are never lost — bought items show "Apply" instead of "Buy" on relog.
+  327|         public string StorePurchases { get; set => SetProperty(ref field, value); } = "";
+  328| 
+  329|         // MyShard Store weapon-glow: bitmask of currently-applied weapon-glow types (one bit per weapon). Persisted
+  330|         // so an applied glow survives relog and is re-broadcast on login. See WeaponGlowManager.Types for the bits.
+  331|         public int StoreWeaponGlowMask { get; set => SetProperty(ref field, value); } = 0;
+  332| 
+  333|         // MyShard Store ship-glow: bitmask of applied ship-glow types (one bit per ship). Persisted; the glow
+  334|         // itself only shows while piloting that ship (server-driven). See ShipGlowManager.Types for the bits.
+  335|         public int StoreShipGlowMask { get; set => SetProperty(ref field, value); } = 0;
+  336| 
+  337|         // MyShard Store ship-dye: the currently applied UO hue for whole-ship recolouring (0 = none). Persisted; the
+  338|         // dye only shows while piloting (server-driven, per ship-part serial). Only one dye active at a time.
+  339|         public int StoreShipDyeHue { get; set => SetProperty(ref field, value); } = 0;
+  340| 
+  341|         // MyShard Store mount-dye: the currently applied UO hue for recolouring the ridden mount (0 = none). Persisted;
+  342|         // broadcast to everyone so others see the dyed mount. Only one dye active at a time.
+  343|         public int StoreMountDyeHue { get; set => SetProperty(ref field, value); } = 0;
+  344| 

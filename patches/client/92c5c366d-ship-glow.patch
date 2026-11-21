@@ -1,0 +1,389 @@
+From 92c5c366d3ad4a68328e90c8f5905e679b4b2031 Mon Sep 17 00:00:00 2001
+From: xMirroRx <xMirroRx@users.noreply.github.com>
+Date: Thu, 9 Jul 2026 02:52:28 +0300
+Subject: [PATCH] =?UTF-8?q?Store=20gemi=20Glow=20Effect:=20Medium/Large=20?=
+ =?UTF-8?q?Dragon=20Ship=20+=20per-ship=20gif=20+=20t=C3=BCm=20par=C3=A7al?=
+ =?UTF-8?q?ar?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- Ship sekmesi kartları kendi gif'leriyle (medi-ship.gif / large-ship.gif), orijinal boyut, kart gif'e göre büyür.
+- Gemi glow'u pilot devreye alınca çıkar (server SetPilot -> ShipGlowState paketi 35). Buy->onay->Apply->Default.
+- TÜM gemi parlar: multi parçaları/yelken (MultiView OwnerSerial) + geminin kendi tile'ı/merkez/tiller/hold lock/
+  plank'lar (ItemView, serial bazlı). Additive + tek hue (ShipGlowManager.GlowHue), yumuşak nefes.
+- OwnerSerial damgası gemilerin gerçek parça-üretim yolunda (Item.cs) da yapılır (bug fix).
+- ShipGlow paketi 34 (client->server mask, login'de gönderilir), ShipGlowState 35 (server->all on/off).
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+---
+ src/ClassicUO.Client/Configuration/Profile.cs |  4 ++
+ .../Game/GameObjects/House.cs                 |  1 +
+ src/ClassicUO.Client/Game/GameObjects/Item.cs |  1 +
+ .../Game/GameObjects/Multi.cs                 |  4 ++
+ .../Game/GameObjects/Views/ItemView.cs        | 14 ++++
+ .../Game/GameObjects/Views/MultiView.cs       | 15 +++++
+ .../Game/Managers/ShipGlowManager.cs          | 50 ++++++++++++++
+ .../Game/UI/Gumps/PlayerHudGump.cs            |  3 +
+ .../Game/UI/Gumps/StoreGump.cs                | 66 ++++++++++++++++++-
+ .../LegionScripting/docs/LegionAPI.md         |  2 +-
+ .../EnhancedOutgoingPackets.cs                | 14 ++++
+ .../EnhancedPackets/EnhancedPacketHandler.cs  | 12 ++++
+ .../EnhancedPackets/EnhancedPacketTypeEnum.cs |  4 +-
+ 13 files changed, 186 insertions(+), 4 deletions(-)
+ create mode 100644 src/ClassicUO.Client/Game/Managers/ShipGlowManager.cs
+
+diff --git a/src/ClassicUO.Client/Configuration/Profile.cs b/src/ClassicUO.Client/Configuration/Profile.cs
+index 9402941fb..f9870d60e 100644
+--- a/src/ClassicUO.Client/Configuration/Profile.cs
++++ b/src/ClassicUO.Client/Configuration/Profile.cs
+@@ -324,6 +324,10 @@ namespace ClassicUO.Configuration
+         // so an applied glow survives relog and is re-broadcast on login. See WeaponGlowManager.Types for the bits.
+         public int StoreWeaponGlowMask { get; set => SetProperty(ref field, value); } = 0;
+ 
++        // MyShard Store ship-glow: bitmask of applied ship-glow types (one bit per ship). Persisted; the glow
++        // itself only shows while piloting that ship (server-driven). See ShipGlowManager.Types for the bits.
++        public int StoreShipGlowMask { get; set => SetProperty(ref field, value); } = 0;
++
+         // How many playtime-unlockable portraits the player has already acknowledged (opened the portrait
+         // window while they were unlocked). -1 = not seeded yet. Used to blink "NEW PORTRAIT" on the HUD
+         // when a fresh one unlocks. See PortraitUnlockManager.
+diff --git a/src/ClassicUO.Client/Game/GameObjects/House.cs b/src/ClassicUO.Client/Game/GameObjects/House.cs
+index 4c8cf578d..22939bb5c 100644
+--- a/src/ClassicUO.Client/Game/GameObjects/House.cs
++++ b/src/ClassicUO.Client/Game/GameObjects/House.cs
+@@ -85,6 +85,7 @@ namespace ClassicUO.Game.GameObjects
+             m.Hue = hue;
+             m.IsCustom = iscustom;
+             m.IsMovable = ismovable;
++            m.OwnerSerial = Serial;   // MyShard: so a whole ship can glow (ShipGlowManager keys by ship serial)
+ 
+             m.SetInWorldTile(x, y, z);
+ 
+diff --git a/src/ClassicUO.Client/Game/GameObjects/Item.cs b/src/ClassicUO.Client/Game/GameObjects/Item.cs
+index 30814e0cb..4603f24eb 100644
+--- a/src/ClassicUO.Client/Game/GameObjects/Item.cs
++++ b/src/ClassicUO.Client/Game/GameObjects/Item.cs
+@@ -293,6 +293,7 @@ namespace ClassicUO.Game.GameObjects
+                     m.IsCustom = false;
+                     m.State = CUSTOM_HOUSE_MULTI_OBJECT_FLAGS.CHMOF_DONT_REMOVE;
+                     m.IsMovable = ItemData.IsMultiMovable;
++                    m.OwnerSerial = Serial;   // MyShard: so a whole Store-glowing ship can light up (keyed by ship serial)
+ 
+                     m.SetInWorldTile(
+                         (ushort)(X + block.X),
+diff --git a/src/ClassicUO.Client/Game/GameObjects/Multi.cs b/src/ClassicUO.Client/Game/GameObjects/Multi.cs
+index 1708ad788..1b774eb7b 100644
+--- a/src/ClassicUO.Client/Game/GameObjects/Multi.cs
++++ b/src/ClassicUO.Client/Game/GameObjects/Multi.cs
+@@ -32,6 +32,10 @@ namespace ClassicUO.Game.GameObjects
+         public ref StaticTiles ItemData => ref Client.Game.UO.FileManager.TileData.StaticData[Graphic];
+         public bool IsCustom;
+         public bool IsVegetation;
++
++        // MyShard: serial of the multi (house/ship) this component belongs to — set by House when the component is
++        // added. Used to glow a whole Store-purchased ship (ShipGlowManager keys by ship serial).
++        public uint OwnerSerial;
+         public int MultiOffsetX;
+         public int MultiOffsetY;
+         public int MultiOffsetZ;
+diff --git a/src/ClassicUO.Client/Game/GameObjects/Views/ItemView.cs b/src/ClassicUO.Client/Game/GameObjects/Views/ItemView.cs
+index f5b6e40e0..d1765703b 100644
+--- a/src/ClassicUO.Client/Game/GameObjects/Views/ItemView.cs
++++ b/src/ClassicUO.Client/Game/GameObjects/Views/ItemView.cs
+@@ -166,6 +166,20 @@ namespace ClassicUO.Game.GameObjects
+ 
+             DrawStaticAnimated(batcher, graphic, posX, posY, hueVec, false, depth, outlineColor: OutlineColor);
+ 
++            // MyShard: Store ship glow for the ship's own tile (multi center) and its tiller — both are Items whose
++            // serial the server marks as glowing. Same additive breathing pass as the multi components.
++            if (ClassicUO.Game.Managers.ShipGlowManager.IsGlowing(Serial))
++            {
++                float glowPhase = (float)(ClassicUO.Time.Ticks % 1300) / 1300f;
++                float glowWave = 0.5f + 0.5f * (float)System.Math.Sin(glowPhase * System.Math.PI * 2.0);
++                float glowInt = 0.20f + 0.30f * glowWave;
++                Vector3 glowVec = ShaderHueTranslator.GetHueVector(ClassicUO.Game.Managers.ShipGlowManager.GlowHue, false, glowInt, false, true);
++
++                batcher.SetBlendState(Microsoft.Xna.Framework.Graphics.BlendState.Additive);
++                DrawStaticAnimated(batcher, graphic, posX, posY, glowVec, false, depth);
++                batcher.SetBlendState(null);
++            }
++
+             return true;
+         }
+ 
+diff --git a/src/ClassicUO.Client/Game/GameObjects/Views/MultiView.cs b/src/ClassicUO.Client/Game/GameObjects/Views/MultiView.cs
+index bf0db8cd6..cb877c5fb 100644
+--- a/src/ClassicUO.Client/Game/GameObjects/Views/MultiView.cs
++++ b/src/ClassicUO.Client/Game/GameObjects/Views/MultiView.cs
+@@ -15,6 +15,7 @@ namespace ClassicUO.Game.GameObjects
+         private int _canBeTransparent;
+         public bool IsHousePreview;
+ 
++
+         public override bool TransparentTest(int z)
+         {
+             bool r = true;
+@@ -95,6 +96,20 @@ namespace ClassicUO.Game.GameObjects
+ 
+             DrawStaticAnimated(batcher, graphic, posX, posY, hueVec, false, depth, outlineColor: OutlineColor);
+ 
++            // MyShard: Store ship glow — if this component belongs to a ship whose glow is active (its pilot bought +
++            // applied it), redraw the tile ADDITIVELY in a single bright hue that breathes, so the whole ship glows.
++            if (OwnerSerial != 0 && ClassicUO.Game.Managers.ShipGlowManager.IsGlowing(OwnerSerial))
++            {
++                float glowPhase = (float)(ClassicUO.Time.Ticks % 1300) / 1300f;
++                float glowWave = 0.5f + 0.5f * (float)System.Math.Sin(glowPhase * System.Math.PI * 2.0);   // 0..1
++                float glowInt = 0.20f + 0.30f * glowWave;                                                   // breathing intensity (~1.5x softer)
++                Vector3 glowVec = ShaderHueTranslator.GetHueVector(ClassicUO.Game.Managers.ShipGlowManager.GlowHue, false, glowInt, false, true);
++
++                batcher.SetBlendState(Microsoft.Xna.Framework.Graphics.BlendState.Additive);
++                DrawStaticAnimated(batcher, graphic, posX, posY, glowVec, false, depth);
++                batcher.SetBlendState(null);
++            }
++
+             if (ItemData.IsLight)
+             {
+                 Client.Game.GetScene<GameScene>().AddLight(this, this, posX + 22, posY + 22);
+diff --git a/src/ClassicUO.Client/Game/Managers/ShipGlowManager.cs b/src/ClassicUO.Client/Game/Managers/ShipGlowManager.cs
+new file mode 100644
+index 000000000..953eba628
+--- /dev/null
++++ b/src/ClassicUO.Client/Game/Managers/ShipGlowManager.cs
+@@ -0,0 +1,50 @@
++using System.Collections.Generic;
++
++namespace ClassicUO.Game.Managers
++{
++    /// <summary>
++    /// Store-purchased SHIP glow. A player buys a per-ship-type glow in the Store and applies it; while they PILOT
++    /// a matching ship, the whole ship glows. Unlike the weapon glow (which is keyed per player), the ship glow is
++    /// keyed per SHIP SERIAL — the server (which owns the pilot state) tells every client "ship S is glowing" and
++    /// each client makes that multi's components glow. This manager holds the set of currently-glowing ship serials.
++    ///
++    /// The bit map (key -> bit) is shared with the Store cards and the server's ship-type check.
++    /// </summary>
++    public static class ShipGlowManager
++    {
++        // Single fixed hue for the whole-ship glow (multi tiles + the ship's own tile + the tiller). Tunable.
++        public const ushort GlowHue = 0x0481;
++
++        // Canonical ship-glow types: key + bit index. Kept in sync with the Store cards and the server's ship
++        // multi-id -> type mapping (Medium Dragon = MULTIDEF 0x0C-0x0F, Large Dragon = 0x14-0x17).
++        public static readonly (string key, int bit)[] Types =
++        {
++            ("medium_dragon", 0),
++            ("large_dragon",  1),
++        };
++
++        // ship (multi item) serials that are currently glowing.
++        private static readonly HashSet<uint> _glow = new();
++
++        public static int BitFor(string key)
++        {
++            foreach ((string k, int bit) in Types)
++                if (k == key)
++                    return bit;
++            return -1;
++        }
++
++        /// <summary>Turn a ship's glow on/off (server-driven, by ship serial).</summary>
++        public static void SetGlow(uint shipSerial, bool on)
++        {
++            if (on)
++                _glow.Add(shipSerial);
++            else
++                _glow.Remove(shipSerial);
++        }
++
++        public static bool IsGlowing(uint shipSerial) => _glow.Contains(shipSerial);
++
++        public static void Clear() => _glow.Clear();
++    }
++}
+diff --git a/src/ClassicUO.Client/Game/UI/Gumps/PlayerHudGump.cs b/src/ClassicUO.Client/Game/UI/Gumps/PlayerHudGump.cs
+index 8a33e1021..3e0a0b76a 100644
+--- a/src/ClassicUO.Client/Game/UI/Gumps/PlayerHudGump.cs
++++ b/src/ClassicUO.Client/Game/UI/Gumps/PlayerHudGump.cs
+@@ -187,6 +187,9 @@ namespace ClassicUO.Game.UI.Gumps
+                 // MyShard Store: restore + broadcast my applied weapon-glow bitmask so my weapon glows for me and
+                 // for everyone else right after login.
+                 StoreGump.PushWeaponGlow(world);
++
++                // MyShard Store: tell the server my applied ship-glow bitmask so it can glow my ship when I pilot it.
++                StoreGump.PushShipGlow(world);
+             }
+ 
+             // Ask for the account's total online time so portrait unlocks can be detected live during play
+diff --git a/src/ClassicUO.Client/Game/UI/Gumps/StoreGump.cs b/src/ClassicUO.Client/Game/UI/Gumps/StoreGump.cs
+index 179ed31f2..7108fbc19 100644
+--- a/src/ClassicUO.Client/Game/UI/Gumps/StoreGump.cs
++++ b/src/ClassicUO.Client/Game/UI/Gumps/StoreGump.cs
+@@ -379,12 +379,36 @@ namespace ClassicUO.Game.UI.Gumps
+             LayoutGrid(wepCards, startY);
+             foreach (Control c in wepCards) groups[0].Add(c);
+ 
+-            // Mount / Ship / Portrait sub-tabs: placeholder products for now.
+-            string[] phTitle = { null, "Mount Glow", "Ship Glow", "Portrait Glow" };
++            // Ship sub-tab (group 2): one glow card per ship type, each with its own gif drawn at ORIGINAL size
++            // (the card grows to fit the gif and centres it). Same Buy -> Apply -> Default toggle as weapons.
++            (string key, string title, string gif)[] ships =
++            {
++                ("medium_dragon", "Medium Dragon Ship Glow Effect", "medi-ship.gif"),
++                ("large_dragon",  "Large Dragon Ship Glow Effect", "large-ship.gif"),
++            };
++            List<Control> shipCards = new List<Control>();
++            foreach ((string key, string title, string gifFile) in ships)
++            {
++                GifImage sgif = null;
++                if (PNGLoader.Instance.TryGetEmbeddedGif(gifFile, out byte[] sbytes) && sbytes != null)
++                    sgif = new GifImage("store:" + gifFile, sbytes);
++                string skey = key;
++                shipCards.Add(new GlowToggleCard(world, sgif, title, "500 Silver", "sg_" + skey,
++                    () => ApplyShipGlow(world, skey),
++                    () => RemoveShipGlow(world, skey),
++                    () => IsShipGlowActive(skey)));
++            }
++            LayoutGrid(shipCards, startY);
++            foreach (Control c in shipCards) groups[2].Add(c);
++
++            // Mount / Portrait sub-tabs: placeholder products for now.
++            string[] phTitle = { null, "Mount Glow", null, "Portrait Glow" };
+             int usableW = W - LEFT_W - CPAD * 2 - 15;
+             int cellW = (usableW - GAP * (COLS - 1)) / COLS;
+             for (int g = 1; g < tabNames.Length; g++)
+             {
++                if (g == 2)   // Ship handled above
++                    continue;
+                 for (int i = 0; i < 3; i++)
+                 {
+                     int col = i % COLS, row = i / COLS;
+@@ -615,6 +639,44 @@ namespace ClassicUO.Game.UI.Gumps
+             AsyncNetClient.Socket?.Send_WeaponGlow(mask);
+         }
+ 
++        // ---- ship glow (persistent bitmask; the glow only shows while PILOTING, driven by the server) ----
++        private static bool IsShipGlowActive(string key)
++        {
++            int bit = ShipGlowManager.BitFor(key);
++            Profile prof = ProfileManager.CurrentProfile;
++            return bit >= 0 && prof != null && (prof.StoreShipGlowMask & (1 << bit)) != 0;
++        }
++
++        private static void ApplyShipGlow(World world, string key)
++        {
++            int bit = ShipGlowManager.BitFor(key);
++            Profile prof = ProfileManager.CurrentProfile;
++            if (bit < 0 || prof == null)
++                return;
++            prof.StoreShipGlowMask |= (1 << bit);
++            PushShipGlow(world);
++            GameActions.Print(world, "[Store] Ship glow applied — board the ship and take the helm to see it.");
++        }
++
++        private static void RemoveShipGlow(World world, string key)
++        {
++            int bit = ShipGlowManager.BitFor(key);
++            Profile prof = ProfileManager.CurrentProfile;
++            if (bit < 0 || prof == null)
++                return;
++            prof.StoreShipGlowMask &= ~(1 << bit);
++            PushShipGlow(world);
++            GameActions.Print(world, "[Store] Ship glow removed.");
++        }
++
++        // Publish my applied ship-glow bitmask to the server (it decides, on piloting, which ship glows for everyone).
++        public static void PushShipGlow(World world)
++        {
++            Profile prof = ProfileManager.CurrentProfile;
++            ushort mask = (ushort)(prof?.StoreShipGlowMask ?? 0);
++            AsyncNetClient.Socket?.Send_ShipGlow(mask);
++        }
++
+         // Nudge the player + target HUDs by (+17,+10) when a frame is applied, back when removed. Idempotent
+         // (guarded by the persisted flag) so repeated Apply/Default clicks don't drift the HUDs.
+         private static void SetFrameHudShift(bool on)
+diff --git a/src/ClassicUO.Client/LegionScripting/docs/LegionAPI.md b/src/ClassicUO.Client/LegionScripting/docs/LegionAPI.md
+index 1bd683113..9fe873480 100644
+--- a/src/ClassicUO.Client/LegionScripting/docs/LegionAPI.md
++++ b/src/ClassicUO.Client/LegionScripting/docs/LegionAPI.md
+@@ -21,7 +21,7 @@ You can now type `-updateapi` in game to download the latest API.py file.
+ 
+ [Additional notes](../notes/)  
+ 
+-*This was generated on `7.8.26`.*
++*This was generated on `7.9.26`.*
+ 
+ ## Properties
+ ### `Events`
+diff --git a/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedOutgoingPackets.cs b/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedOutgoingPackets.cs
+index 3ffcc6e13..ba5627330 100644
+--- a/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedOutgoingPackets.cs
++++ b/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedOutgoingPackets.cs
+@@ -153,6 +153,20 @@ internal static class EnhancedOutgoingPackets
+         writer.Dispose();
+     }
+ 
++    // Client -> server: publish your applied Store ship-glow bitmask (one bit per ship type). The server keeps it
++    // and, when you take the helm of a matching ship, tells everyone to glow that ship. 0 = none.
++    public static void Send_ShipGlow(this AsyncNetClient socket, ushort mask)
++    {
++        StackDataWriter f = Extensions.GetWriter(EnhancedPacketType.ShipGlow);
++        ref StackDataWriter writer = ref f;
++
++        writer.WriteUInt16BE(mask);
++
++        writer.FinalLength();
++        socket.Send(writer.BufferWritten, true);
++        writer.Dispose();
++    }
++
+     // Client -> server: send a global "Trade" chat message. The server relays it (tagged with the sender's
+     // character name) to every online player, who show it under their Trade journal tab (same model as World Chat).
+     public static void Send_TradeChat(this AsyncNetClient socket, string message)
+diff --git a/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedPacketHandler.cs b/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedPacketHandler.cs
+index 2dc3da086..17cc31263 100644
+--- a/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedPacketHandler.cs
++++ b/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedPacketHandler.cs
+@@ -50,6 +50,7 @@ public class EnhancedPacketHandler
+         Handler.Add(EnhancedPacketType.GmAnnounce, OnGmAnnounce);
+         Handler.Add(EnhancedPacketType.StorePortrait, OnStorePortrait);
+         Handler.Add(EnhancedPacketType.WeaponGlow, OnWeaponGlow);
++        Handler.Add(EnhancedPacketType.ShipGlowState, OnShipGlowState);
+     }
+ 
+     /// <summary>
+@@ -63,6 +64,17 @@ public class EnhancedPacketHandler
+         Game.Managers.WeaponGlowManager.SetMask(serial, mask);
+     }
+ 
++    /// <summary>
++    /// Server -> all clients: a ship (serial) should glow on (1) or off (0) — the whole multi lights up while its
++    /// pilot (who bought + applied that ship's glow) has the helm. Rendered by MultiView.
++    /// </summary>
++    private static void OnShipGlowState(ref StackDataReader p, int version)
++    {
++        uint shipSerial = p.ReadUInt32BE();
++        byte on = p.ReadUInt8();
++        Game.Managers.ShipGlowManager.SetGlow(shipSerial, on != 0);
++    }
++
+     /// <summary>
+     /// Server -> all clients: a player's applied Store portrait (sp#) and portrait frame (pi#). Stored so the
+     /// target HUD can show them live when you target that player. Empty ids clear their entry.
+diff --git a/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedPacketTypeEnum.cs b/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedPacketTypeEnum.cs
+index 0de03fc5f..43c1b994f 100644
+--- a/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedPacketTypeEnum.cs
++++ b/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedPacketTypeEnum.cs
+@@ -35,5 +35,7 @@ public enum EnhancedPacketType : ushort
+     PortraitPlaytimeRequest, // client -> server: ask the server for my account's total online time
+     GmAnnounce,              // server -> all clients: a GM ".duyuru" broadcast -> big centered text over each player's own head
+     StorePortrait,           // client -> server -> all: a player's Store portrait (sp#) + frame (pi#) so others see it on the target HUD
+-    WeaponGlow               // client -> server -> all: bitmask of a player's active Store weapon-glow types -> others see the glow on that weapon
++    WeaponGlow,              // client -> server -> all: bitmask of a player's active Store weapon-glow types -> others see the glow on that weapon
++    ShipGlow,               // client -> server: bitmask of a player's applied Store ship-glow types (server decides on piloting)
++    ShipGlowState           // server -> all: a ship (serial) glow on/off -> everyone sees the whole ship glow while it's piloted
+ }
+-- 
+2.54.0.windows.1
+

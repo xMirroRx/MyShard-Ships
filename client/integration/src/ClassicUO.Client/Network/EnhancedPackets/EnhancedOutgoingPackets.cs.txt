@@ -1,0 +1,39 @@
+// Excerpt of MyShard-Client/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedOutgoingPackets.cs
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 150-184 -----
+  150| 
+  151|         writer.FinalLength();
+  152|         socket.Send(writer.BufferWritten, true);
+  153|         writer.Dispose();
+  154|     }
+  155| 
+  156|     // Client -> server: publish your applied Store ship-glow bitmask (one bit per ship type). The server keeps it
+  157|     // and, when you take the helm of a matching ship, tells everyone to glow that ship. 0 = none.
+  158|     public static void Send_ShipGlow(this AsyncNetClient socket, ushort mask)
+  159|     {
+  160|         StackDataWriter f = Extensions.GetWriter(EnhancedPacketType.ShipGlow);
+  161|         ref StackDataWriter writer = ref f;
+  162| 
+  163|         writer.WriteUInt16BE(mask);
+  164| 
+  165|         writer.FinalLength();
+  166|         socket.Send(writer.BufferWritten, true);
+  167|         writer.Dispose();
+  168|     }
+  169| 
+  170|     // Client -> server: publish your applied Store ship-DYE hue. The server keeps it and, when you take the helm of
+  171|     // ANY ship, tells everyone to recolour that whole ship to this hue. 0 = none (removes the dye).
+  172|     public static void Send_ShipDye(this AsyncNetClient socket, ushort hue)
+  173|     {
+  174|         StackDataWriter f = Extensions.GetWriter(EnhancedPacketType.ShipDye);
+  175|         ref StackDataWriter writer = ref f;
+  176| 
+  177|         writer.WriteUInt16BE(hue);
+  178| 
+  179|         writer.FinalLength();
+  180|         socket.Send(writer.BufferWritten, true);
+  181|         writer.Dispose();
+  182|     }
+  183| 
+  184|     // Client -> server: publish your applied Store mount-DYE hue. The server keeps it and relays it to everyone, who

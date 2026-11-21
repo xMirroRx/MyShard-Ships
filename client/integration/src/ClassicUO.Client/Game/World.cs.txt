@@ -1,0 +1,48 @@
+// Excerpt of MyShard-Client/src/ClassicUO.Client/Game/World.cs
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 36-56 -----
+   36|             WorldTextManager = new WorldTextManager(this);
+   37|             _effectManager = new EffectManager(this);
+   38|             MessageManager = new MessageManager(this);
+   39|             ContainerManager = new ContainerManager(this);
+   40|             IgnoreManager = new IgnoreManager(this);
+   41|             SkillsGroupManager = new SkillsGroupManager(this);
+   42|             ChatManager = new ChatManager(this);
+   43|             AuraManager = new AuraManager(this);
+   44|             TargetManager = new TargetManager(this);
+   45|             DelayedObjectClickManager = new DelayedObjectClickManager(this);
+   46|             BoatMovingManager = new BoatMovingManager(this);
+   47|             NameOverHeadManager = new NameOverHeadManager(this);
+   48|             Macros = new MacroManager(this);
+   49|             CommandManager = new CommandManager(this);
+   50|             Weather = new Weather(this);
+   51|             InfoBars = new InfoBarManager(this);
+   52|             DurabilityManager = new DurabilityManager(this);
+   53|             OPL = new ObjectPropertiesListManager(this);
+   54|             CoolDownBarManager = new CoolDownBarManager(this);
+   55|         }
+   56| 
+
+// ----- lines 92-112 -----
+   92|         public SkillsGroupManager SkillsGroupManager { get; }
+   93| 
+   94|         public ChatManager ChatManager { get; }
+   95| 
+   96|         public AuraManager AuraManager { get; }
+   97| 
+   98|         public TargetManager TargetManager { get; }
+   99| 
+  100|         public DelayedObjectClickManager DelayedObjectClickManager { get; }
+  101| 
+  102|         public BoatMovingManager BoatMovingManager { get; }
+  103| 
+  104|         public NameOverHeadManager NameOverHeadManager { get; }
+  105| 
+  106|         public MacroManager Macros { get; }
+  107| 
+  108|         public CommandManager CommandManager { get; }
+  109| 
+  110|         public Weather Weather { get; }
+  111| 
+  112|         public InfoBarManager InfoBars { get; }

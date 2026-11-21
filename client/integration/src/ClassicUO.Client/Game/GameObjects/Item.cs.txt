@@ -1,0 +1,25 @@
+// Excerpt of MyShard-Client/src/ClassicUO.Client/Game/GameObjects/Item.cs
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 352-372 -----
+  352|                 Math.Max(Math.Abs(minX), maxX),
+  353|                 Math.Max(Math.Abs(minY), maxY)
+  354|             );
+  355| 
+  356|             house.Bounds = MultiInfo.Value;
+  357| 
+  358|             UIManager.ForEach<MiniMapGump>(g => g.RequestUpdateContents());
+  359| 
+  360|             if (World.HouseManager.EntityIntoHouse(Serial, World.Player)) GameScene.Instance?.UpdateMaxDrawZ(true);
+  361| 
+  362|             World.BoatMovingManager.ClearSteps(Serial);
+  363|         }
+  364| 
+  365|         public override void CheckGraphicChange(byte animIndex = 0)
+  366|         {
+  367|             if (!IsMulti)
+  368|             {
+  369|                 if (!IsCorpse)
+  370|                 {
+  371|                     AllowedToDraw = CanBeDrawn(World, Graphic);
+  372|                 }

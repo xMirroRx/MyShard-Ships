@@ -1,0 +1,25 @@
+// Excerpt of MyShard-Client/src/ClassicUO.Client/Game/GameObjects/House.cs
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 78-98 -----
+   78|             ushort y,
+   79|             sbyte z,
+   80|             bool iscustom,
+   81|             bool ismovable
+   82|         )
+   83|         {
+   84|             var m = Multi.Create(_world, graphic);
+   85|             m.Hue = hue;
+   86|             m.IsCustom = iscustom;
+   87|             m.IsMovable = ismovable;
+   88|             m.OwnerSerial = Serial;   // MyShard: so a whole ship can glow (ShipGlowManager keys by ship serial)
+   89| 
+   90|             m.SetInWorldTile(x, y, z);
+   91| 
+   92|             Components.Add(m);
+   93| 
+   94|             // Incrementally add to spatial index if it's already built
+   95|             if (!_spatialIndexDirty)
+   96|             {
+   97|                 long key = GetSpatialKey(x, y);
+   98|                 if (!_spatialIndex.TryGetValue(key, out List<Multi> list))

@@ -1,0 +1,25 @@
+// Excerpt of MyShard-Server/src/game/CSector.h
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 98-118 -----
+   98| 	size_t GetCharComplexity() const;
+   99|     bool CheckCharComplexity() const noexcept;
+  100| 	bool IsCharActiveIn( const CChar * pChar );
+  101| 	bool IsCharDisconnectedIn( const CChar * pChar );
+  102| 	size_t GetInactiveChars() const;
+  103| 	size_t GetClientsNumber() const;
+  104| 	int64 GetLastClientTime() const;
+  105| 	bool MoveCharToSector(CChar* pChar);
+  106| 
+  107| 	bool _CanSleep(bool fCheckAdjacents) const;
+  108| 	void SetSectorWakeStatus();	// Ships may enter a sector before it's riders !
+  109| 
+  110| 	// CTimedObject
+  111| private:
+  112|     virtual void _GoSleep() override;
+  113| 	virtual void  GoSleep() override;
+  114| 
+  115|     virtual void _GoAwake() override;
+  116| 	virtual void  GoAwake() override;
+  117| 
+  118|     // General.

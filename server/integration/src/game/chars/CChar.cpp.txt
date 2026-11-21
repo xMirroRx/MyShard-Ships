@@ -1,0 +1,78 @@
+// Excerpt of MyShard-Server/src/game/chars/CChar.cpp
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 8-28 -----
+    8| #include "../../common/CUID.h"
+    9| #include "../../common/CRect.h"
+   10| #include "../../common/CLog.h"
+   11| #include "../clients/CAccount.h"
+   12| #include "../clients/CClient.h"
+   13| #include "../../network/CClientIterator.h"
+   14| #include "../../network/send.h"
+   15| #include "../items/CItem.h"
+   16| #include "../items/CItemContainer.h"
+   17| #include "../items/CItemMemory.h"
+   18| #include "../items/CItemShip.h"
+   19| #include "../items/CItemMulti.h"
+   20| #include "../items/CItemStone.h"
+   21| #include "../components/CCPropsChar.h"
+   22| #include "../components/CCPropsItemChar.h"
+   23| #include "../components/CCSpawn.h"
+   24| #include "../CContainer.h"
+   25| #include "../CSector.h"
+   26| #include "../CServer.h"
+   27| #include "../CWorld.h"
+   28| #include "../CWorldGameTime.h"
+
+// ----- lines 492-515 -----
+  492| 	// remove all trade windows.
+  493| 	for (CSObjContRec* pObjRec : GetIterationSafeCont())
+  494| 	{
+  495| 		CItem* pItem = static_cast<CItem*>(pObjRec);
+  496| 		if (pItem->IsType(IT_EQ_TRADE_WINDOW) )
+  497| 			pItem->Delete();
+  498| 	}
+  499| 	if ( !IsClientActive() )
+  500| 		return;
+  501| 
+  502| 	// If this char is on a IT_SHIP then we need to stop the ship !
+  503| 	if ( m_pArea && m_pArea->IsFlag( REGION_FLAG_SHIP ))
+  504| 	{
+  505| 		CItemShip * pShipItem = dynamic_cast <CItemShip *>( m_pArea->GetResourceID().ItemFindFromResource());
+  506| 		if ( pShipItem )
+  507| 			pShipItem->Stop();
+  508| 	}
+  509| 
+  510|     m_pClient = nullptr;
+  511| }
+  512| 
+  513| // Client is Attaching to this CChar.
+  514| void CChar::ClientAttach( CClient * pClient )
+  515| {
+
+// ----- lines 2233-2257 -----
+ 2233| 					pRef = static_cast<CItemMulti*>(pMultiStorage->GetHouseAt(iPos).ItemFind());
+ 2234| 					SKIP_SEPARATORS(ptcKey);
+ 2235| 					return true;
+ 2236| 				}
+ 2237| 				return false;
+ 2238|             case CHR_SHIP:
+ 2239| 				if (m_pPlayer)
+ 2240| 				{
+ 2241| 					const int16 iPos = (int16)Exp_GetSingle(ptcKey);
+ 2242| 					CMultiStorage* pMultiStorage = m_pPlayer->GetMultiStorage();
+ 2243| 					if (pMultiStorage->GetShipCountReal() <= iPos)
+ 2244| 					{
+ 2245| 						return false;
+ 2246| 					}
+ 2247| 					pRef = static_cast<CItemShip*>(pMultiStorage->GetShipAt(iPos).ItemFind());
+ 2248| 					SKIP_SEPARATORS(ptcKey);
+ 2249| 					return true;
+ 2250| 				}
+ 2251| 				return false;
+ 2252| 			case CHR_MEMORYFINDTYPE:	// FInd a type of memory.
+ 2253| 				pRef = Memory_FindTypes((word)(Exp_GetSingle(ptcKey)));
+ 2254| 				SKIP_SEPARATORS(ptcKey);
+ 2255| 				return true;
+ 2256| 			case CHR_MEMORYFIND:	// Find a memory of a UID
+ 2257| 				pRef = Memory_FindObj( (CUID) Exp_GetSingle( ptcKey ));

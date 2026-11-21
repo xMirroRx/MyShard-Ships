@@ -1,0 +1,27 @@
+// Excerpt of MyShard-Server/src/game/chars/CCharStatus.cpp
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 1332-1354 -----
+ 1332|             const CItem * pWeapon = m_uidWeapon.ItemFind();
+ 1333|             if (pWeapon)
+ 1334|             {
+ 1335|                 IT_TYPE iType = pWeapon->GetType();
+ 1336|                 if ((iType == IT_WEAPON_BOW) || (iType == IT_WEAPON_XBOW) || (iType == IT_WEAPON_THROWING))
+ 1337|                     return (iDist <= pWeapon->GetRangeH());
+ 1338|             }
+ 1339|             break;
+ 1340|         }
+ 1341| 
+ 1342| 		case IT_SHIP_PLANK:
+ 1343| 		case IT_SHIP_SIDE:
+ 1344| 		case IT_SHIP_SIDE_LOCKED:
+ 1345| 		case IT_ROPE:
+ 1346| 			if ( IsStatFlag(STATF_SLEEPING|STATF_FREEZE|STATF_STONE) )
+ 1347| 				break;
+ 1348| 			return (iDist <= g_Cfg.m_iMaxShipPlankTeleport);
+ 1349| 
+ 1350| 		default:
+ 1351| 			break;
+ 1352| 		}
+ 1353| 
+ 1354|         if ( !fDeathImmune && IsStatFlag(STATF_FREEZE) )

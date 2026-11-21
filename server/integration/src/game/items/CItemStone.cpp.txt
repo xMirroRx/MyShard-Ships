@@ -1,0 +1,73 @@
+// Excerpt of MyShard-Server/src/game/items/CItemStone.cpp
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 1-21 -----
+    1| 
+    2| //#include "../../common/CException.h" // included in the precompiled header
+    3| //#include "../../common/CExpression.h" // included in the precompiled header
+    4| //#include "../../common/CScriptParserBufs.h" // included in the precompiled header via CExpression.h
+    5| #include "../../common/CLog.h"
+    6| #include "../chars/CChar.h"
+    7| #include "../CServer.h"
+    8| #include "../CWorld.h"
+    9| #include "CItemStone.h"
+   10| #include "CItemMulti.h"
+   11| #include "CItemShip.h"
+   12| 
+   13| 
+   14| CItemStone::CItemStone( ITEMID_TYPE id, CItemBase * pItemDef ) :
+   15|     CTimedObject(PROFILE_ITEMS),
+   16|     CItem( id, pItemDef )
+   17| {
+   18| 	EXC_TRY("Constructor");
+   19| 
+   20| 	m_itStone.m_iAlign = STONEALIGN_STANDARD;
+   21|     g_World.m_Stones.emplace_back(this);
+
+// ----- lines 320-342 -----
+  320|     }
+  321|     else if (!strnicmp("ship.", ptcKey, 5))
+  322|     {
+  323|         ptcKey = ptcKey + 5;
+  324|         if (!ptcKey[0])
+  325|             return false;
+  326| 
+  327|         int16 nNumber = (int16)Exp_GetVal(ptcKey);
+  328|         SKIP_SEPARATORS(ptcKey);
+  329| 
+  330|         if (nNumber < GetMultiStorage()->GetShipCountReal())
+  331|         {
+  332|             pRef = static_cast<CItemShip*>(GetMultiStorage()->GetShipAt(nNumber).ItemFind());
+  333|             return true;
+  334|         }
+  335|     }
+  336| 
+  337| 	return CItem::r_GetRef( ptcKey, pRef );
+  338| }
+  339| 
+  340| bool CItemStone::r_LoadVal( CScript & s ) // Load an item Script
+  341| {
+  342| 	ADDTOCALLSTACK("CItemStone::r_LoadVal");
+
+// ----- lines 661-681 -----
+  661|         case STC_MAXHOUSES:
+  662|             sVal.Format16Val(_iMaxHouses);
+  663|             return true;
+  664|         case STC_MAXSHIPS:
+  665|             sVal.Format16Val(_iMaxShips);
+  666|             return true;
+  667|         case STC_HOUSES:
+  668|             sVal.Format16Val(GetMultiStorage()->GetHouseCountReal());
+  669|             return true;
+  670|         case STC_SHIPS:
+  671|             sVal.Format16Val(GetMultiStorage()->GetShipCountReal());
+  672|             return true;
+  673| 		case STC_ABBREVIATIONTOGGLE:
+  674| 			{
+  675| 				CStoneMember * pMember = GetMember(pCharSrc);
+  676| 				CVarDefCont * pResult = nullptr;
+  677| 
+  678|                 auto gReader = g_ExprGlobals.mtEngineLockedReader();
+  679| 				if ( pMember == nullptr )
+  680| 				{
+  681|                     pResult = gReader->m_VarDefs.GetKey("STONECONFIG_VARIOUSNAME_NONMEMBER");

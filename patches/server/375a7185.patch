@@ -1,0 +1,214 @@
+From 375a7185868e0fa8506c3ccb16bd06f6fdac9345 Mon Sep 17 00:00:00 2001
+From: xMirroRx <xMirroRx@users.noreply.github.com>
+Date: Thu, 9 Jul 2026 02:52:50 +0300
+Subject: [PATCH] =?UTF-8?q?Store=20gemi=20glow:=20t=C3=BCm=20component'ler?=
+ =?UTF-8?q?=20+=20g=C3=B6r=C3=BC=C5=9F-senkronu=20(kusursuz)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- SetPilot: gemi tipini DEFNAME'den tanır (medium_dragon_ship / large_dragon_ship). Pilotun o tip için glow'u
+  varsa gemi + TÜM component'lerine (tiller, hold lock, plank...) yayın yapar ve SHIPGLOWON etiketi yazar.
+  Dümen bırakınca söndürür + etiketleri temizler.
+- addItem_OnGround: bir gemi parçası bir oyuncunun görüşüne girince SHIPGLOWON=1 ise o oyuncuya
+  PacketShipGlowState(...,1) gönderir -> parlayan gemiye sonradan yaklaşan/giren herkes de görür.
+- send.h/send.cpp: PacketShipGlowState (type 35). receive.cpp type 34: ship-glow mask'ı char'a saklar.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+---
+ src/game/clients/CClientMsg.cpp        |  8 ++++
+ src/game/components/CCMultiMovable.cpp | 64 ++++++++++++++++++++++++++
+ src/network/receive.cpp                |  5 ++
+ src/network/send.cpp                   | 22 +++++++++
+ src/network/send.h                     | 14 ++++++
+ 5 files changed, 113 insertions(+)
+
+diff --git a/src/game/clients/CClientMsg.cpp b/src/game/clients/CClientMsg.cpp
+index 6c4e4651..8a426695 100644
+--- a/src/game/clients/CClientMsg.cpp
++++ b/src/game/clients/CClientMsg.cpp
+@@ -405,6 +405,14 @@ void CClient::addItem_OnGround( CItem * pItem ) // Send items (on ground)
+         ASSERT(pItemMulti);
+         pItemMulti->SendVersionTo(this);
+ 	}
++
++	// MyShard: this ship part (ship tile / tiller / hold / plank / ...) currently carries an active Store glow
++	// (SHIPGLOWON tag set by the pilot). A player walking INTO view mid-glow never got the SetPilot broadcast, so
++	// send it now — they see the same glowing ship as everyone else. Cleared when the pilot leaves the helm.
++	if ( pItem->GetKeyNum("SHIPGLOWON") != 0 )
++	{
++		new PacketShipGlowState(this, (dword)pItem->GetUID(), 1);
++	}
+ }
+ 
+ void CClient::addItem_Equipped( const CItem * pItem )
+diff --git a/src/game/components/CCMultiMovable.cpp b/src/game/components/CCMultiMovable.cpp
+index 859edd6c..1548d5d9 100644
+--- a/src/game/components/CCMultiMovable.cpp
++++ b/src/game/components/CCMultiMovable.cpp
+@@ -1,3 +1,4 @@
++#include <cstring>
+ #include "../../common/sphere_library/CSRand.h"
+ //#include "../../common/CExpression.h" // included in the precompiled header
+ //#include "../../common/CScriptParserBufs.h" // included in the precompiled header via CExpression.h
+@@ -209,6 +210,32 @@ uint CCMultiMovable::ListObjs(CObjBase ** ppObjList)
+     return uiCount;
+ }
+ 
++// MyShard: which Store ship-glow bit (if any) matches this ship, by its DEFNAME (facing-independent prefix).
++static int MyShard_GetShipGlowBit(const CItem *pShip)
++{
++	lpctstr pszName = pShip->GetResourceName();
++	if (pszName == nullptr)
++		return -1;
++	if (strstr(pszName, "medium_dragon_ship") != nullptr)
++		return 0;
++	if (strstr(pszName, "large_dragon_ship") != nullptr)
++		return 1;
++	return -1;
++}
++
++// MyShard: tell every online client to glow (on=1) / stop glowing (on=0) a ship part, by its serial.
++static void MyShard_BroadcastShipGlow(dword dwShipSerial, byte on)
++{
++	ClientIterator it;
++	for (CClient *pTo = it.next(); pTo != nullptr; pTo = it.next())
++	{
++		if (pTo->GetChar() == nullptr)
++			continue;
++		new PacketShipGlowState(pTo, dwShipSerial, on);
++	}
++}
++
++
+ void CCMultiMovable::SetPilot(CChar *pChar)
+ {
+ 	ADDTOCALLSTACK("CCMultiMovable::SetPilot");
+@@ -230,6 +257,22 @@ void CCMultiMovable::SetPilot(CChar *pChar)
+ 			pCharPrev->SysMessageDefault(DEFMSG_SHIP_PILOT_OFF);
+ 		}
+ 		pItemThis->m_itShip.m_Pilot.InitUID();
++		// MyShard: stop the whole ship's glow when leaving the helm (ship tile + every component item). Also clear
++		// the SHIPGLOWON tag so players walking into view later don't get a stale glow re-sent to them.
++		pItemThis->SetKeyNum("SHIPGLOWON", 0);
++		MyShard_BroadcastShipGlow(pItemThis->GetUID(), 0);
++		{
++			CItemMulti *pMultiGlow = static_cast<CItemMulti*>(pItemThis);
++			for (size_t i = 0; i < pMultiGlow->_lComps.size(); ++i)
++			{
++				CItem *pComp = pMultiGlow->_lComps[i].ItemFind();
++				if (pComp != nullptr)
++				{
++					pComp->SetKeyNum("SHIPGLOWON", 0);
++					MyShard_BroadcastShipGlow(pComp->GetUID(), 0);
++				}
++			}
++		}
+ 		return;
+ 	}
+ 
+@@ -267,6 +310,27 @@ void CCMultiMovable::SetPilot(CChar *pChar)
+ 		pChar->LayerAdd(pMemory, LAYER_HORSE);
+ 		pChar->SysMessageDefault(DEFMSG_SHIP_PILOT_ON);
+ 		pItemThis->m_itShip.m_Pilot = pChar->GetUID();
++
++		// MyShard: if this pilot bought + applied the Store glow for this ship type, glow the whole ship for everyone
++		// (ship tiles + the tiller item).
++		int iGlowBit = MyShard_GetShipGlowBit(pItemThis);
++		if (iGlowBit >= 0 && (pChar->GetKeyNum("SHIPGLOW") & ((int64)1 << iGlowBit)) != 0)
++		{
++			// Tag the ship + every component with SHIPGLOWON so a player walking into view later gets the glow
++			// re-sent to them (addItem_OnGround), and broadcast it live to everyone online right now.
++			pItemThis->SetKeyNum("SHIPGLOWON", 1);
++			MyShard_BroadcastShipGlow(pItemThis->GetUID(), 1);
++			CItemMulti *pMultiGlow = static_cast<CItemMulti*>(pItemThis);
++			for (size_t i = 0; i < pMultiGlow->_lComps.size(); ++i)
++			{
++				CItem *pComp = pMultiGlow->_lComps[i].ItemFind();
++				if (pComp != nullptr)
++				{
++					pComp->SetKeyNum("SHIPGLOWON", 1);
++					MyShard_BroadcastShipGlow(pComp->GetUID(), 1);
++				}
++			}
++		}
+ 	}
+ }
+ 
+diff --git a/src/network/receive.cpp b/src/network/receive.cpp
+index 84a2a83b..de740658 100644
+--- a/src/network/receive.cpp
++++ b/src/network/receive.cpp
+@@ -3724,6 +3724,11 @@ bool PacketEnhanced::onReceive(CNetState* net)
+ 			new PacketWeaponGlow(pTo, dwSerial, wMask);
+ 		}
+ 	}
++	else if (type == 34)				// ShipGlow — store the player's applied ship-glow bitmask (used on piloting)
++	{
++		word wMask = readInt16();
++		pChar->SetKeyNum("SHIPGLOW", wMask);
++	}
+ 
+ 	return true;
+ }
+diff --git a/src/network/send.cpp b/src/network/send.cpp
+index 4d7ebdd9..fa064abc 100644
+--- a/src/network/send.cpp
++++ b/src/network/send.cpp
+@@ -4299,6 +4299,28 @@ PacketWeaponGlow::PacketWeaponGlow(const CClient* target, dword serial, word mas
+ 	push(target);
+ }
+ 
++/***************************************************************************
++ *
++ *
++ *	Packet 0xCE : PacketShipGlowState	(custom) MyShard: a ship (serial) glow on/off -> every online player sees
++ *										the whole ship light up while its pilot has the helm.
++ *
++ *
++ ***************************************************************************/
++PacketShipGlowState::PacketShipGlowState(const CClient* target, dword shipSerial, byte on)
++	: PacketSend(0xCE, 0, PRI_NORMAL)
++{
++	ADDTOCALLSTACK("PacketShipGlowState::PacketShipGlowState");
++
++	initLength();			// 2-byte length, finalized on send
++	writeInt16(35);			// EnhancedPacketType.ShipGlowState
++	writeInt16(0);			// version
++	writeInt32(shipSerial);	// the ship (multi item) that should glow
++	writeByte(on);			// 1 = glow on, 0 = off
++
++	push(target);
++}
++
+ /***************************************************************************
+  *
+  *
+diff --git a/src/network/send.h b/src/network/send.h
+index 3ca1b703..3a4e1d7d 100644
+--- a/src/network/send.h
++++ b/src/network/send.h
+@@ -1666,6 +1666,20 @@ public:
+ 	PacketWeaponGlow(const CClient* target, dword serial, word mask);
+ };
+ 
++/***************************************************************************
++ *
++ *
++ *	Packet 0xCE : PacketShipGlowState	(custom) MyShard: a ship (serial) glow on/off, sent to every online player
++ *										so the whole ship lights up while its pilot (who applied the glow) has the helm.
++ *
++ *
++ ***************************************************************************/
++class PacketShipGlowState : public PacketSend
++{
++public:
++	PacketShipGlowState(const CClient* target, dword shipSerial, byte on);
++};
++
+ /***************************************************************************
+  *
+  *
+-- 
+2.54.0.windows.1
+

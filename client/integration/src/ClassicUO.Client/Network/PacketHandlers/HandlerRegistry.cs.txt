@@ -1,0 +1,25 @@
+// Excerpt of MyShard-Client/src/ClassicUO.Client/Network/PacketHandlers/HandlerRegistry.cs
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 112-132 -----
+  112|         (0xDE, UpdateMobileStatus.Receive),
+  113|         (0xDF, BuffDebuff.Receive),
+  114|         (0xE2, NewCharacterAnimation.Receive),
+  115|         (0xE3, KREncryptionResponse.Receive),
+  116|         (0xE5, DisplayWaypoint.Receive),
+  117|         (0xE6, RemoveWaypoint.Receive),
+  118|         (0xF0, KrriosClientSpecial.Receive),
+  119|         (0xF1, FreeshardListR.Receive),
+  120|         (0xF3, UpdateItemSA.Receive),
+  121|         (0xF5, DisplayMap.Receive),
+  122|         (0xF6, BoatMoving.Receive),
+  123|         (0xF7, PacketList.Receive),
+  124|         (EnhancedPacketHandler.EPID, EnhancedPacketHandler.Handle), //For handling custom packets
+  125| 
+  126|         // login
+  127|         (0xA8, ServerListReceived.Receive),
+  128|         (0x8C, ReceiveServerRelay.Receive),
+  129|         (0x86, UpdateCharacterList.Receive),
+  130|         (0xA9, ReceiveCharacterList.Receive),
+  131|         (0x82, ReceiveLoginRejection.Receive),
+  132|         (0x85, ReceiveLoginRejection.Receive),

@@ -1,0 +1,61 @@
+// Excerpt of MyShard-Client/src/ClassicUO.Client/Network/EnhancedPackets/EnhancedPacketHandler.cs
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 48-69 -----
+   48|         Handler.Add(EnhancedPacketType.PortraitChoice, OnPortraitChoice);
+   49|         Handler.Add(EnhancedPacketType.TradeChat, OnTradeChat);
+   50|         Handler.Add(EnhancedPacketType.BuffBar, OnBuffBar);
+   51|         Handler.Add(EnhancedPacketType.TradeRequest, OnTradeRequest);
+   52|         Handler.Add(EnhancedPacketType.TradeDecline, OnTradeDecline);
+   53|         Handler.Add(EnhancedPacketType.WhisperReceive, OnWhisperReceive);
+   54|         Handler.Add(EnhancedPacketType.PortraitPlaytime, OnPortraitPlaytime);
+   55|         Handler.Add(EnhancedPacketType.GmAnnounce, OnGmAnnounce);
+   56|         Handler.Add(EnhancedPacketType.StorePortrait, OnStorePortrait);
+   57|         Handler.Add(EnhancedPacketType.WeaponGlow, OnWeaponGlow);
+   58|         Handler.Add(EnhancedPacketType.ShipGlowState, OnShipGlowState);
+   59|         Handler.Add(EnhancedPacketType.ShipDyeState, OnShipDyeState);
+   60|         Handler.Add(EnhancedPacketType.MountDyeState, OnMountDyeState);
+   61|         Handler.Add(EnhancedPacketType.StoreOwnedList, OnStoreOwnedList);
+   62|         Handler.Add(EnhancedPacketType.DuelPrompt, OnDuelPrompt);
+   63|         Handler.Add(EnhancedPacketType.DuelState, OnDuelState);
+   64|         Handler.Add(EnhancedPacketType.JumpFx, OnJumpFx);
+   65|         Handler.Add(EnhancedPacketType.AttackTiming, OnAttackTiming);
+   66|         Handler.Add(EnhancedPacketType.GatherNodeLevel, OnGatherNodeLevel);
+   67|         Handler.Add(EnhancedPacketType.ProgressBar, OnProgressBar);
+   68|         Handler.Add(EnhancedPacketType.StatusExtra, OnStatusExtra);
+   69|     }
+
+// ----- lines 209-241 -----
+  209|     }
+  210| 
+  211|     /// <summary>
+  212|     /// Server -> all clients: a ship (serial) should glow on (1) or off (0) — the whole multi lights up while its
+  213|     /// pilot (who bought + applied that ship's glow) has the helm. Rendered by MultiView.
+  214|     /// </summary>
+  215|     private static void OnShipGlowState(ref StackDataReader p, int version)
+  216|     {
+  217|         uint shipSerial = p.ReadUInt32BE();
+  218|         byte on = p.ReadUInt8();
+  219|         Game.Managers.ShipGlowManager.SetGlow(shipSerial, on != 0);
+  220|     }
+  221| 
+  222|     /// <summary>
+  223|     /// Server -> all clients: a ship part (serial) should be dyed to [hue] (0 = clear). The whole multi + its
+  224|     /// components recolour to that hue while the pilot (who bought + applied that dye) has the helm. Rendered by
+  225|     /// MultiView (by OwnerSerial) and ItemView (by Serial).
+  226|     /// </summary>
+  227|     private static void OnShipDyeState(ref StackDataReader p, int version)
+  228|     {
+  229|         uint shipSerial = p.ReadUInt32BE();
+  230|         ushort hue = p.ReadUInt16BE();
+  231|         Game.Managers.ShipDyeManager.SetDye(shipSerial, hue);
+  232|     }
+  233| 
+  234|     /// <summary>
+  235|     /// Server -> all clients: a rider (serial) has mount dye [hue] (0 = clear). That player's mount (whatever they
+  236|     /// ride) recolours to this hue for everyone. Rendered by MobileView (recolours only the mount).
+  237|     /// </summary>
+  238|     private static void OnMountDyeState(ref StackDataReader p, int version)
+  239|     {
+  240|         uint riderSerial = p.ReadUInt32BE();
+  241|         ushort hue = p.ReadUInt16BE();

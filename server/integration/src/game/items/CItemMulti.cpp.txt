@@ -1,0 +1,639 @@
+// Excerpt of MyShard-Server/src/game/items/CItemMulti.cpp
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 7-36 -----
+    7| #include "../uo_files/CUOMultiItemRec.h"
+    8| #include "../chars/CChar.h"
+    9| #include "../clients/CClient.h"
+   10| #include "../items/CItemStone.h"
+   11| #include "../CServer.h"
+   12| #include "../CWorld.h"
+   13| #include "../CWorldMap.h"
+   14| #include "../CWorldSearch.h"
+   15| #include "../triggers.h"
+   16| #include "CItemMulti.h"
+   17| #include "CItemShip.h"
+   18| #include "CItemContainer.h"
+   19| #include <algorithm>
+   20| 
+   21| /////////////////////////////////////////////////////////////////////////////
+   22| 
+   23| CItemMulti::CItemMulti(ITEMID_TYPE id, CItemBase * pItemDef, bool fTurnable) :    // CItemBaseMulti
+   24|     CTimedObject(PROFILE_MULTIS),
+   25|     CItem(id, pItemDef),
+   26|     CCMultiMovable(fTurnable)
+   27| {
+   28|     CItemBaseMulti * pItemBase = static_cast<CItemBaseMulti*>(Base_GetDef());
+   29|     _shipSpeed.period = pItemBase->_shipSpeed.period;
+   30|     _shipSpeed.tiles = pItemBase->_shipSpeed.tiles;
+   31|     _eSpeedMode = pItemBase->m_SpeedMode;
+   32| 
+   33|     m_pRegion = nullptr;
+   34| 
+   35|     _iHouseType = HOUSE_PRIVATE;
+   36|     g_World.m_Multis.emplace_back(this);
+
+// ----- lines 224-244 -----
+  224|     ASSERT(pRegionBack != m_pRegion);
+  225| 
+  226|     // Create the new region rectangle.
+  227|     CRectMap rect = pMultiDef->m_rect;
+  228|     rect.m_map = pt.m_map;
+  229|     rect.OffsetRect(pt.m_x, pt.m_y);
+  230|     m_pRegion->SetRegionRect(rect);
+  231|     m_pRegion->m_pt = pt;
+  232| 
+  233|     dword dwFlags = pMultiDef->m_dwRegionFlags;
+  234|     if (IsType(IT_SHIP))
+  235|     {
+  236|         dwFlags |= REGION_FLAG_SHIP;
+  237|     }
+  238|     else if (IsType(IT_MULTI) || IsType(IT_MULTI_CUSTOM))
+  239|     {
+  240|         if (CItemBase::IsID_House(GetID()))
+  241|             dwFlags |= REGION_FLAG_HOUSE;
+  242|     }
+  243|     else
+  244|     {
+
+// ----- lines 261-281 -----
+  261|         if (pChar == nullptr) //Invalid char? Ignore.
+  262|         {
+  263|             break;
+  264|         }
+  265|         if (pChar->m_pArea == m_pRegion) //If it's already in house region, ignore him/her.
+  266|         {
+  267|             continue;
+  268|         }
+  269|         // MyShard: the search is a square of the multi's largest side; only chars really standing on the multi
+  270|         // belong to it (a player next to a freshly placed ship stayed in the ship's region until he walked).
+  271|         if (!m_pRegion->IsInside2d(pChar->GetTopPoint()) || (IsType(IT_SHIP) && !Multi_IsOnFootprint(pChar->GetTopPoint())))
+  272|         {
+  273|             continue;
+  274|         }
+  275|         pChar->MoveToRegion(m_pRegion, false); //Move the character to house region.
+  276|     }
+  277| 
+  278|     //g_Log.EventError("Realizing MULTI region at P=%hd,%hd,%hhd,%hhu. Multi uid=0%x. Multi rect: %d,%d, %d,%d.\n",
+  279|     //    pt.m_x, pt.m_y, pt.m_z, pt.m_map, (dword)GetUID(),
+  280|     //    rect.m_left, rect.m_top, rect.m_right, rect.m_bottom);
+  281|     return m_pRegion->RealizeRegion();
+
+// ----- lines 329-349 -----
+  329|     CPointMap pt(GetTopPoint());
+  330|     pt.m_x += dx;
+  331|     pt.m_y += dy;
+  332|     pt.m_z += dz;
+  333| 
+  334|     bool fNeedKey = false;
+  335| 
+  336|     switch (pItem->GetType())
+  337|     {
+  338|         case IT_SIGN_GUMP:
+  339|         case IT_SHIP_TILLER:
+  340|             pItem->m_uidLink = GetUID();
+  341|             FALLTHROUGH;
+  342|         case IT_KEY:    // it will get locked down with the house ?
+  343|             pItem->m_itKey.m_UIDLock.SetPrivateUID(dwKeyCode);    // Set the key id for the key/sign.
+  344|             m_uidLink.SetPrivateUID(pItem->GetUID());
+  345|             // Do not break, those need fNeedKey set to true.
+  346|             FALLTHROUGH;
+  347|         case IT_DOOR:
+  348|         case IT_CONTAINER:
+  349|             fNeedKey = true;
+
+// ----- lines 368-388 -----
+  368|     if (IsType(IT_MULTI_ADDON))
+  369|     {
+  370|         fNeedKey = false;
+  371|     }
+  372|     return fNeedKey;
+  373| }
+  374| 
+  375| void CItemMulti::Multi_Setup(CChar *pChar, dword dwKeyCode)
+  376| {
+  377|     ADDTOCALLSTACK("CItemMulti::Multi_Setup");
+  378|     // Create house or Ship extra stuff.
+  379|     // ARGS:
+  380|     //  dwKeyCode = set the key code for the doors/sides to this in case it's a drydocked ship.
+  381|     // NOTE:
+  382|     //  This can only be done after the house is given location.
+  383| 
+  384|     const CItemBaseMulti * pMultiDef = Multi_GetDef();
+  385|     // We are top level.
+  386|     if (pMultiDef == nullptr || !IsTopLevel())
+  387|     {
+  388|         return;
+
+// ----- lines 405-425 -----
+  405| 
+  406|     Multi_GetSign();    // set the m_uidLink
+  407| 
+  408|     if (pChar)
+  409|     {
+  410|         SetOwner(pChar->GetUID());
+  411| 
+  412|         if (fNeedKey)
+  413|         {
+  414|             m_itShip.m_UIDCreator = pChar->GetUID();
+  415|             if (IsType(IT_SHIP))
+  416|             {
+  417|                 if (g_Cfg._fAutoShipKeys)
+  418|                 {
+  419|                     GenerateKey(pChar->GetUID(), true);
+  420|                 }
+  421|             }
+  422|             else
+  423|             {
+  424|                 if (g_Cfg._fAutoHouseKeys)
+  425|                 {
+
+// ----- lines 451-471 -----
+  451|             return true;
+  452|     }
+  453|     return false;
+  454| }
+  455| 
+  456| bool CItemMulti::Multi_IsPartOf(const CItem * pItem) const
+  457| {
+  458|     ADDTOCALLSTACK("CItemMulti::Multi_IsPartOf");
+  459|     // Assume it is in my area test already.
+  460|     // IT_MULTI
+  461|     // IT_SHIP
+  462|     if (!pItem)
+  463|     {
+  464|         return false;
+  465|     }
+  466|     if (pItem == this)
+  467|     {
+  468|         return true;
+  469|     }
+  470|     if (pItem->m_uidLink == GetUID())
+  471|     {
+
+// ----- lines 526-546 -----
+  526|         }
+  527|         if (pItem->IsType(type))
+  528|         {
+  529|             return pItem;
+  530|         }
+  531|     }
+  532| }
+  533| 
+  534| bool CItemMulti::_OnTick()
+  535| {
+  536|     if (!CCMultiMovable::_OnTick())
+  537|     {
+  538|         return CItem::_OnTick();
+  539|     }
+  540|     return true;
+  541| }
+  542| 
+  543| void CItemMulti::OnMoveFrom()
+  544| {
+  545|     ADDTOCALLSTACK("CItemMulti::OnMoveFrom");
+  546|     // Being removed from the top level.
+
+// ----- lines 603-636 -----
+  603| }
+  604| 
+  605| CItem * CItemMulti::Multi_GetSign()
+  606| {
+  607|     ADDTOCALLSTACK("CItemMulti::Multi_GetSign");
+  608|     // Get my sign or tiller link.
+  609| 
+  610|     CItem * pTiller = m_uidLink.ItemFind();
+  611|     if (pTiller == nullptr)
+  612|     {
+  613|         pTiller = Multi_FindItemType(IsType(IT_SHIP) ? IT_SHIP_TILLER : IT_SIGN_GUMP);
+  614|         if (pTiller == nullptr)
+  615|         {
+  616|             return(this);
+  617|         }
+  618|         m_uidLink = pTiller->GetUID();  // Link the multi to it's sign/tiller
+  619|     }
+  620|     return pTiller;
+  621| }
+  622| 
+  623| void CItemMulti::OnHearRegion(lpctstr pszCmd, CChar * pSrc)
+  624| {
+  625|     ADDTOCALLSTACK("CItemMulti::OnHearRegion");
+  626|     // IT_SHIP or IT_MULTI
+  627| 
+  628|     const CItemBaseMulti * pMultiDef = Multi_GetDef();
+  629|     if (pMultiDef == nullptr)
+  630|         return;
+  631|     TALKMODE_TYPE mode = TALKMODE_SAY;
+  632| 
+  633|     for (size_t i = 0; i < pMultiDef->m_Speech.size(); ++i)
+  634|     {
+  635|         CResourceLink * pLink = pMultiDef->m_Speech[i].GetRef();
+  636|         ASSERT(pLink);
+
+// ----- lines 1225-1245 -----
+ 1225| {
+ 1226|     ADDTOCALLSTACK("CItemMulti::Redeed");
+ 1227|     if (GetKeyNum("REMOVED") > 0) // Just don't pass from here again, to avoid duplicated deeds.
+ 1228|     {
+ 1229|         return;
+ 1230|     }
+ 1231| 
+ 1232|     TRIGRET_TYPE tRet = TRIGRET_RET_FALSE;
+ 1233|     bool fTransferAll = false;
+ 1234| 
+ 1235|     ITEMID_TYPE itDeed = IsType(IT_SHIP) ? ITEMID_SHIP_PLANS1 : ITEMID_DEED1;
+ 1236|     CItem *pDeed = CItem::CreateBase(itDeed);
+ 1237|     ASSERT(pDeed);
+ 1238| 
+ 1239|     tchar *pszName = Str_GetTemp();
+ 1240|     const CItemBaseMulti * pItemBase = static_cast<const CItemBaseMulti*>(Base_GetDef());
+ 1241|     snprintf(pszName, Str_TempLength(), g_Cfg.GetDefaultMsg(DEFMSG_DEED_NAME), pItemBase->GetName());
+ 1242|     pDeed->SetName(pszName);
+ 1243| 
+ 1244|     bool fIsAddon = IsType(IT_MULTI_ADDON);
+ 1245|     if (fIsAddon)
+
+// ----- lines 2279-2299 -----
+ 2279|     nullptr
+ 2280| };
+ 2281| 
+ 2282| bool CItemMulti::r_Verb(CScript & s, CTextConsole * pSrc) // Execute command from script
+ 2283| {
+ 2284|     ADDTOCALLSTACK("CItemMulti::r_Verb");
+ 2285|     EXC_TRY("Verb");
+ 2286|     // Speaking in this multis region.
+ 2287|     // return: true = command for the multi.
+ 2288| 
+ 2289|     if (CCMultiMovable::r_Verb(s, pSrc))
+ 2290|     {
+ 2291|         return true;
+ 2292|     }
+ 2293|     const int iCmd = FindTableSorted(s.GetKey(), sm_szVerbKeys, ARRAY_COUNT(sm_szVerbKeys) - 1);
+ 2294|     switch (iCmd)
+ 2295|     {
+ 2296|         case SHV_DELACCESS:
+ 2297|         {
+ 2298|             const CUID uidAccess(s.GetArgDWVal());
+ 2299|             if (!uidAccess.IsValidUID())
+
+// ----- lines 2722-2742 -----
+ 2722|     if (auto val = GetIncreasedStorage())
+ 2723|     {
+ 2724|         s.WriteKeyVal("INCREASEDSTORAGE", val);
+ 2725|     }
+ 2726| }
+ 2727| 
+ 2728| bool CItemMulti::r_WriteVal(lpctstr ptcKey, CSString & sVal, CTextConsole * pSrc, bool fNoCallParent, bool fNoCallChildren)
+ 2729| {
+ 2730|     UnreferencedParameter(fNoCallChildren);
+ 2731|     ADDTOCALLSTACK("CItemMulti::r_WriteVal");
+ 2732|     if (CCMultiMovable::r_WriteVal(ptcKey, sVal, pSrc))
+ 2733|     {
+ 2734|         return true;
+ 2735|     }
+ 2736|     int iCmd = FindTableHeadSorted(ptcKey, sm_szLoadKeys, ARRAY_COUNT(sm_szLoadKeys) - 1);
+ 2737|     if (iCmd >= 0)
+ 2738|     {
+ 2739|         ptcKey += strlen(sm_szLoadKeys[iCmd]);
+ 2740|     }
+ 2741|     SKIP_SEPARATORS(ptcKey);
+ 2742|     switch (iCmd)
+
+// ----- lines 3022-3042 -----
+ 3022|             return (fNoCallParent ? false : CItem::r_WriteVal(ptcKey, sVal, pSrc));
+ 3023|     }
+ 3024|     return true;
+ 3025| }
+ 3026| 
+ 3027| bool CItemMulti::r_LoadVal(CScript & s)
+ 3028| {
+ 3029|     ADDTOCALLSTACK("CItemMulti::r_LoadVal");
+ 3030|     EXC_TRY("LoadVal");
+ 3031| 
+ 3032|     if (CCMultiMovable::r_LoadVal(s))
+ 3033|     {
+ 3034|         return true;
+ 3035|     }
+ 3036|     int iCmd = FindTableHeadSorted(s.GetKey(), sm_szLoadKeys, ARRAY_COUNT(sm_szLoadKeys) - 1);
+ 3037| 
+ 3038|     switch (iCmd)
+ 3039|     {
+ 3040|         case SHL_REGION:
+ 3041|         {
+ 3042|             if (!IsTopLevel())
+
+// ----- lines 3259-3279 -----
+ 3259| }
+ 3260| 
+ 3261| CItem *CItemMulti::Multi_Create(CChar *pChar, const CItemBase * pItemDef, CPointMap & pt, CItem *pDeed)
+ 3262| {
+ 3263|     if (!pChar || !pChar->m_pPlayer)
+ 3264|     {
+ 3265|         return nullptr;
+ 3266|     }
+ 3267| 
+ 3268|     ASSERT(pItemDef);
+ 3269|     const bool fShip = pItemDef->IsType(IT_SHIP);    // must be in water.
+ 3270| 
+ 3271|     // pMultiDef can be nullptr, because we can also add simple items with a deed, not only multis.
+ 3272|     const CItemBaseMulti* pMultiDef = dynamic_cast <const CItemBaseMulti*> (pItemDef);
+ 3273| 
+ 3274|     /*
+ 3275|     * First thing to do is to check if the character creating the multi is allowed to have it
+ 3276|     */
+ 3277|     if (fShip)
+ 3278|     {
+ 3279|         ASSERT(pMultiDef);
+
+// ----- lines 3386-3421 -----
+ 3386|                 for (; y < rect.m_bottom; ++y)  // Y loop
+ 3387|                 {
+ 3388|                     ptn.m_y = (short)y; // *point North
+ 3389| 
+ 3390|                     if (!ptn.IsValidPoint())    // Invalid point (out of map bounds).
+ 3391|                     {
+ 3392|                         pChar->SysMessageDefault(DEFMSG_ITEMUSE_MULTI_FAIL);
+ 3393|                         return nullptr;
+ 3394|                     }
+ 3395| 
+ 3396|                     uint64 uiBlockFlags = (fShip) ? CAN_C_SWIM : CAN_C_WALK; // Flags to check: Ships should check for swimable tiles.
+ 3397|                     /*
+ 3398|                     * Intensive check returning the top Z point of the given X, Y coords
+ 3399|                     * It uses the dwBlockBlacks passed to check the new Z level.
+ 3400|                     * Also update those dwBlockFlags with all the flags found at the given location.
+ 3401|                     * 3rd param is set to also update Z with any house component found in the proccess.
+ 3402|                     */
+ 3403|                     ptn.m_z = CWorldMap::GetHeightPoint2(ptn, uiBlockFlags, true);
+ 3404|                     if (abs(ptn.m_z - pt.m_z) > 4)  // Difference of Z > 4? so much, stop.
+ 3405|                     {
+ 3406|                         pChar->SysMessageDefault(DEFMSG_ITEMUSE_MULTI_BUMP);
+ 3407|                         return nullptr;
+ 3408|                     }
+ 3409|                     if (fShip)
+ 3410|                     {
+ 3411|                         if (!(uiBlockFlags & CAN_I_WATER))  // Ships must be placed on water.
+ 3412|                         {
+ 3413|                             pChar->SysMessageDefault(DEFMSG_ITEMUSE_MULTI_SHIPW);
+ 3414|                             return nullptr;
+ 3415|                         }
+ 3416|                     }
+ 3417|                     else if (uiBlockFlags & (CAN_I_WATER | CAN_I_BLOCK | CAN_I_CLIMB))  // Did the intensive check find some undesired flags? Stop.
+ 3418|                     {
+ 3419|                         pChar->SysMessageDefault(DEFMSG_ITEMUSE_MULTI_BLOCKED);
+ 3420|                         return nullptr;
+ 3421|                     }
+
+// ----- lines 3440-3460 -----
+ 3440|                 int y = rect.m_top;
+ 3441|                 for (; y < rect.m_bottom; ++y)
+ 3442|                 {
+ 3443|                     ptn.m_y = (short)y;
+ 3444|                     /*
+ 3445|                     * Search for any multi region on that point.
+ 3446|                     */
+ 3447|                     CRegion * pRegion = ptn.GetRegion(REGION_TYPE_MULTI | REGION_TYPE_AREA | REGION_TYPE_ROOM);
+ 3448|                     /*
+ 3449|                     * If there is no region on that point (invalid point?) or the region has the NOBUILDING flag, stop
+ 3450|                     * Ships are allowed to bypass this check??
+ 3451|                     */
+ 3452|                     if ((pRegion == nullptr) || (pRegion->IsFlag(REGION_FLAG_NOBUILDING) && !fShip))
+ 3453|                     {
+ 3454|                         pChar->SysMessageDefault(DEFMSG_ITEMUSE_MULTI_FAIL);
+ 3455|                         return nullptr;
+ 3456|                     }
+ 3457|                 }
+ 3458|             }
+ 3459|         }
+ 3460|     }
+
+// ----- lines 3480-3500 -----
+ 3480|     {
+ 3481|         // Now name the guild
+ 3482|         CItemStone * pStone = dynamic_cast <CItemStone*>(pItemNew);
+ 3483|         ASSERT(pStone);
+ 3484|         pStone->AddRecruit(pChar, STONEPRIV_MASTER);
+ 3485|         if (CClient* pClient = pChar->GetClientActive())
+ 3486|         {
+ 3487|             pClient->addPromptConsole(CLIMODE_PROMPT_STONE_NAME, g_Cfg.GetDefaultMsg(DEFMSG_ITEMUSE_GUILDSTONE_NEW), pItemNew->GetUID());
+ 3488|         }
+ 3489|     }
+ 3490|     else if (pItemDef->IsType(IT_SHIP))
+ 3491|     {
+ 3492|         pItemNew->Sound(g_Rand.GetVal(2) ? 0x12 : 0x13);
+ 3493|     }
+ 3494|     return pItemNew;
+ 3495| }
+ 3496| 
+ 3497| void CItemMulti::OnComponentCreate(CItem * pComponent, bool fIsAddon)
+ 3498| {
+ 3499|     UnreferencedParameter(fIsAddon);
+ 3500|     CScript eComponent("+t_house_component");
+
+// ----- lines 3507-3534 -----
+ 3507|             pComponent->r_ExecSingle("EVENTS +ei_house_door");
+ 3508|             pComponent->SetType(IT_DOOR_LOCKED);
+ 3509|             break;
+ 3510|         }
+ 3511|         case IT_CONTAINER:
+ 3512|         {
+ 3513|             pComponent->r_ExecSingle("EVENTS  +ei_house_container");
+ 3514|             pComponent->SetType(IT_CONTAINER_LOCKED);
+ 3515|             break;
+ 3516|         }
+ 3517|         case IT_SHIP_SIDE:
+ 3518|         {
+ 3519|             pComponent->SetType(IT_SHIP_SIDE_LOCKED);
+ 3520|             break;
+ 3521|         }
+ 3522|         case IT_SHIP_HOLD:
+ 3523|         {
+ 3524|             pComponent->SetType(IT_SHIP_HOLD_LOCK);
+ 3525|             break;
+ 3526|         }
+ 3527|         case IT_TELEPAD:
+ 3528|         {
+ 3529|             pComponent->r_ExecSingle("EVENTS +ei_house_telepad");
+ 3530|             break;
+ 3531|         }
+ 3532|         default:
+ 3533|             break;
+ 3534|     }
+
+// ----- lines 3561-3581 -----
+ 3561|         }
+ 3562|         else if (_uidSrc.IsItem())   //Only guild/town stones
+ 3563|         {
+ 3564|             pMulti->SetGuild(CUID());
+ 3565|         }
+ 3566|     }
+ 3567| 
+ 3568|     for (auto& pair : _lShips)
+ 3569|     {
+ 3570|         const CUID& uid = pair.first;
+ 3571|         CItemShip *pShip = static_cast<CItemShip*>(uid.ItemFind());
+ 3572|         if (!pShip)
+ 3573|             continue;
+ 3574| 
+ 3575|         if (_uidSrc.IsChar())
+ 3576|         {
+ 3577|             pShip->RevokePrivs(_uidSrc);
+ 3578|         }
+ 3579|         else if (_uidSrc.IsItem())   //Only guild/town stones
+ 3580|         {
+ 3581|             pShip->SetGuild(CUID());
+
+// ----- lines 3591-3611 -----
+ 3591|     {
+ 3592|         return;
+ 3593|     }
+ 3594|     const CItemMulti *pMulti = static_cast<CItemMulti*>(uidMulti.ItemFind());
+ 3595|     if (!pMulti)
+ 3596|     {
+ 3597|         return;
+ 3598|     }
+ 3599|     CObjBase *pSrc = _uidSrc.ObjFind();
+ 3600|     const bool isChar = pSrc && pSrc->IsChar();
+ 3601|     if (pMulti->IsType(IT_SHIP))
+ 3602|     {
+ 3603|         if (_lShips.empty() && isChar)
+ 3604|         {
+ 3605|             pSrc->r_ExecSingle("EVENTS +e_ship_priv");
+ 3606|         }
+ 3607|         AddShip(uidMulti, ePriv);
+ 3608|     }
+ 3609|     else
+ 3610|     {
+ 3611|         if (_lHouses.empty() && isChar)
+
+// ----- lines 3613-3633 -----
+ 3613|             pSrc->r_ExecSingle("EVENTS +e_house_priv");
+ 3614|         }
+ 3615|         AddHouse(uidMulti, ePriv);
+ 3616|     }
+ 3617| }
+ 3618| 
+ 3619| void CMultiStorage::DelMulti(const CUID& uidMulti)
+ 3620| {
+ 3621|     CItemMulti *pMulti = static_cast<CItemMulti*>(uidMulti.ItemFind());
+ 3622|     CObjBase *pSrc = _uidSrc.ObjFind();
+ 3623|     if (pMulti->IsType(IT_SHIP))
+ 3624|     {
+ 3625|         DelShip(uidMulti);
+ 3626|         if (_lShips.empty() && pSrc)
+ 3627|         {
+ 3628|             pSrc->r_ExecSingle("EVENTS -e_ship_priv");
+ 3629|         }
+ 3630|         DelShip(uidMulti);
+ 3631|     }
+ 3632|     else
+ 3633|     {
+
+// ----- lines 3716-3736 -----
+ 3716| }
+ 3717| 
+ 3718| HOUSE_PRIV CMultiStorage::GetPriv(const CUID& uidMulti)
+ 3719| {
+ 3720|     ADDTOCALLSTACK("CMultiStorage::GetPrivMulti");
+ 3721|     const CItemMulti *pMulti = static_cast<CItemMulti*>(uidMulti.ItemFind());
+ 3722|     if (pMulti->IsType(IT_MULTI) || pMulti->IsType(IT_MULTI_CUSTOM))
+ 3723|     {
+ 3724|         return _lHouses[uidMulti];
+ 3725|     }
+ 3726|     else if (pMulti->IsType(IT_SHIP))
+ 3727|     {
+ 3728|         return _lShips[uidMulti];
+ 3729|     }
+ 3730|     return HP_NONE;
+ 3731| }
+ 3732| 
+ 3733| bool CMultiStorage::CanAddHouse(const CUID& uidChar, int16 iHouseCount) const
+ 3734| {
+ 3735|     ADDTOCALLSTACK("CMultiStorage::CanAddHouse");
+ 3736|     if (uidChar.IsItem())
+
+// ----- lines 3815-3840 -----
+ 3815|     UnreferencedParameter(s);
+ 3816| }
+ 3817| 
+ 3818| void CMultiStorage::AddShip(const CUID& uidShip, HOUSE_PRIV ePriv)
+ 3819| {
+ 3820|     ADDTOCALLSTACK("CMultiStorage::AddShip");
+ 3821|     if (!uidShip.IsValidUID())
+ 3822|     {
+ 3823|         return;
+ 3824|     }
+ 3825|     if (GetShipPos(uidShip) >= 0)
+ 3826|     {
+ 3827|         return;
+ 3828|     }
+ 3829| 
+ 3830|     const CItemShip* pShip = static_cast<CItemShip*>(uidShip.ItemFind());
+ 3831|     TRIGRET_TYPE tRet = TRIGRET_RET_DEFAULT;
+ 3832| 
+ 3833|     CScriptTriggerArgsPtr pScriptArgs = CScriptParserBufs::GetCScriptTriggerArgsPtr();
+ 3834|     pScriptArgs->m_iN1 = pShip->GetMultiCount();
+ 3835|     pScriptArgs->m_iN2 = ePriv;
+ 3836|     pScriptArgs->m_iN3 = (ePriv == HOUSE_PRIV::HP_OWNER) ? 1 : 0;
+ 3837| 
+ 3838|     if (IsTrigUsed(TRIGGER_ADDMULTI))
+ 3839|     {
+ 3840|         CChar* pChar = _uidSrc.CharFind();
+
+// ----- lines 3915-3971 -----
+ 3915|     {
+ 3916|         if (pChar->GetClientActive())
+ 3917|         {
+ 3918|             iMaxShips = pChar->GetClientActive()->GetAccount()->_iMaxShips;
+ 3919|         }
+ 3920|     }
+ 3921|     if (iMaxShips == 0)
+ 3922|     {
+ 3923|         return true;
+ 3924|     }
+ 3925|     if (GetShipCountTotal() + iShipCount <= iMaxShips)
+ 3926|     {
+ 3927|         return true;
+ 3928|     }
+ 3929|     pChar->SysMessageDefault(DEFMSG_HOUSE_ADD_LIMIT);
+ 3930|     return false;
+ 3931| }
+ 3932| 
+ 3933| int16 CMultiStorage::GetShipPos(const CUID& uidShip)
+ 3934| {
+ 3935|     if (_lShips.empty())
+ 3936|     {
+ 3937|         return -1;
+ 3938|     }
+ 3939|     int16 i = 0;
+ 3940|     for (MultiOwnedCont::iterator it = _lShips.begin(); it != _lShips.end(); ++it)
+ 3941|     {
+ 3942|         if (it->first == uidShip)
+ 3943|         {
+ 3944|             return i;
+ 3945|         }
+ 3946|         ++i;
+ 3947|     }
+ 3948|     return -1;
+ 3949| }
+ 3950| 
+ 3951| int16 CMultiStorage::GetShipCountTotal()
+ 3952| {
+ 3953|     return _iShipsTotal;
+ 3954| }
+ 3955| 
+ 3956| int16 CMultiStorage::GetShipCountReal()
+ 3957| {
+ 3958|     return (int16)_lShips.size();
+ 3959| }
+ 3960| 
+ 3961| CUID CMultiStorage::GetShipAt(int16 iPos)
+ 3962| {
+ 3963|     MultiOwnedCont::const_iterator it = _lShips.begin();
+ 3964|     std::advance(it, iPos);
+ 3965|     return it->first;
+ 3966| }
+ 3967| 
+ 3968| void CMultiStorage::ClearShips()
+ 3969| {
+ 3970|     _lShips.clear();
+ 3971| }

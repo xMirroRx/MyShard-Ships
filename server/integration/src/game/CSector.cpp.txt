@@ -1,0 +1,25 @@
+// Excerpt of MyShard-Server/src/game/CSector.cpp
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 1112-1132 -----
+ 1112|     }
+ 1113| 
+ 1114| 	//default behaviour;
+ 1115| 	const int64 iTimeDiff = CWorldGameTime::GetCurrentTime().GetTimeRaw() - GetLastClientTime();
+ 1116| 	return (iTimeDiff > g_Cfg._iSectorSleepDelay); // Sector Sleep timeout.
+ 1117| }
+ 1118| 
+ 1119| void CSector::SetSectorWakeStatus()
+ 1120| {
+ 1121| 	ADDTOCALLSTACK("CSector::SetSectorWakeStatus");
+ 1122| 	// Ships may enter a sector before it's riders ! ships need working timers to move !
+ 1123| 	m_Chars_Active.SetTimeLastClient(CWorldGameTime::GetCurrentTime().GetTimeRaw());
+ 1124|     if (_IsSleeping())
+ 1125|     {
+ 1126|         _GoAwake();
+ 1127|     }
+ 1128| }
+ 1129| 
+ 1130| void CSector::Close(bool fClosingWorld)
+ 1131| {
+ 1132| 	ADDTOCALLSTACK("CSector::Close");

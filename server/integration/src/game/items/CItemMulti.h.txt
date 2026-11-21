@@ -1,0 +1,93 @@
+// Excerpt of MyShard-Server/src/game/items/CItemMulti.h
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 1-19 -----
+    1| /**
+    2| * @file CItemMulti.h
+    3| *
+    4| */
+    5| 
+    6| #ifndef _INC_CITEMMULTI_H
+    7| #define _INC_CITEMMULTI_H
+    8| 
+    9| #include "../components/CCMultiMovable.h"
+   10| #include "CItem.h"
+   11| #include <map>
+   12| 
+   13| 
+   14| #define MAX_MULTI_LIST_OBJS 128
+   15| #define MAX_MULTI_CONTENT 1024
+   16| 
+   17| 
+   18| enum HOUSE_TYPE
+   19| {
+
+// ----- lines 27-52 -----
+   27|     TRANSFER_NOTHING = 0x0,
+   28|     TRANSFER_ALL = 0x1,  // Transfer Locked Down, Addons and normal items placed on ground (Not Components).
+   29|     TRANSFER_LOCKDOWNS = 0x2,  // Transfer Locked Down items
+   30|     TRANSFER_ADDONS = 0x4,  // Transfer Addons
+   31|     TRANSFER_SECURED = 0x8   // Transfer Secured Containers
+   32| };
+   33| 
+   34| class CChar;
+   35| class CItemStone;
+   36| class CItemContainer;
+   37| class CItemShip;
+   38| 
+   39| class CItemMulti : public CItem, public CCMultiMovable
+   40| {
+   41|     friend class CCMultiMovable;
+   42| // IT_MULTI IT_SHIP
+   43| // A ship or house etc.
+   44| private:
+   45|     static lpctstr const sm_szLoadKeys[];
+   46|     static lpctstr const sm_szVerbKeys[];
+   47|     static lpctstr const sm_szRefKeys[];
+   48| 
+   49|     // house permissions
+   50|     CUID _uidOwner;     // Owner's character
+   51|     CUID _uidGuild; // Linked Guild.
+   52|     std::vector<CUID> _lCoowners;   // List of Coowners.
+
+// ----- lines 774-813 -----
+  774|     * @param uidChar the char.
+  775|     * @param iShipCount the MultiCount of the ship.
+  776|     * @return true if the char has space for the ship.
+  777|     */
+  778|     bool CanAddShip(const CUID& uidChar, int16 iShipCount);
+  779|     /**
+  780|     * @brief Returns the position of the given ship.
+  781|     * @param uidShip the ship.
+  782|     * @return the position.
+  783|     */
+  784|     int16 GetShipPos(const CUID& uidShip);
+  785|     /**
+  786|     * @brief Returns the total count of ships.
+  787|     *
+  788|     * This method counts the real ships and the value each one
+  789|     * adds with MultiCount.
+  790|     * @return the count.
+  791|     */
+  792|     int16 GetShipCountTotal();
+  793|     /**
+  794|     * @brief The real count of ships.
+  795|     * @return the count.
+  796|     */
+  797|     int16 GetShipCountReal();
+  798|     /**
+  799|     * @brief Gets the ship at the given position.
+  800|     * @param iPos the position.
+  801|     * @return the ship.
+  802|     */
+  803|     CUID GetShipAt(int16 iPos);
+  804|     /**
+  805|     * @brief Clears the ships list.
+  806|     */
+  807|     void ClearShips();
+  808| 
+  809|     /**
+  810|     * @brief Writes the houses/ships on the worldsave.
+  811|     * @param s The datastream.
+  812|     */
+  813|     void r_Write(CScript & s) const;

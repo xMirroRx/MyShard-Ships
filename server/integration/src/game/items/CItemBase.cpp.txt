@@ -1,0 +1,222 @@
+// Excerpt of MyShard-Server/src/game/items/CItemBase.cpp
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 312-332 -----
+  312| 
+  313| GUMP_TYPE CItemBase::IsTypeContainer() const noexcept
+  314| {
+  315| 	// IT_CONTAINER
+  316| 	// return the container gump id.
+  317| 
+  318| 	switch ( m_type )
+  319| 	{
+  320| 		case IT_CONTAINER:
+  321| 		case IT_SIGN_GUMP:
+  322| 		case IT_SHIP_HOLD:
+  323| 		case IT_BBOARD:
+  324| 		case IT_CORPSE:
+  325| 		case IT_TRASH_CAN:
+  326| 		case IT_GAME_BOARD:
+  327| 		case IT_EQ_BANK_BOX:
+  328| 		case IT_EQ_VENDOR_BOX:
+  329| 		case IT_KEYRING:
+  330| 			return m_ttContainer.m_idGump;
+  331| 		default:
+  332| 			return GUMP_NONE;
+
+// ----- lines 351-371 -----
+  351| 			return false;
+  352| 	}
+  353| }
+  354| 
+  355| bool CItemBase::IsTypeMulti( IT_TYPE type ) noexcept	// static
+  356| {
+  357| 	switch( type )
+  358| 	{
+  359| 		case IT_MULTI:
+  360| 		case IT_MULTI_CUSTOM:
+  361| 		case IT_SHIP:
+  362|         case IT_MULTI_ADDON:
+  363| 			return true;
+  364| 
+  365| 		default:
+  366| 			return false;
+  367| 	}
+  368| }
+  369| 
+  370| bool CItemBase::IsTypeEquippable(IT_TYPE type, LAYER_TYPE layer) noexcept // static
+  371| {
+
+// ----- lines 414-434 -----
+  414|     return false;
+  415| }
+  416| 
+  417| bool CItemBase::IsTypeEquippable() const noexcept
+  418| {
+  419| 	return IsTypeEquippable(m_type, (LAYER_TYPE)m_layer);
+  420| }
+  421| 
+  422| bool CItemBase::IsID_Multi( ITEMID_TYPE id ) noexcept // static
+  423| {
+  424| 	// NOTE: Ships are also multi's
+  425| 	return ( id >= ITEMID_MULTI && id < ITEMID_MULTI_MAX );
+  426| }
+  427| 
+  428| bool CItemBase::IsID_House(ITEMID_TYPE id) noexcept
+  429| {
+  430|     // IT_MULTI
+  431|     // IT_MULTI_CUSTOM
+  432|     return (((id >= ITEMID_HOUSE_SMALL_ST_PL) && (id <= ITEMID_HOUSE_SMALL_SHOP_MB)) || ((id >= ITEMID_HOUSEFOUNDATION_7x7) && (id <= ITEMID_HOUSEFOUNDATION_32x32)));
+  433| }
+  434| 
+
+// ----- lines 504-524 -----
+  504|   	int doordir = IsID_Door(id)-1;
+  505|     if ( doordir < 0 )
+  506| 		return false;
+  507|     if ( doordir & DOOR_OPENED )
+  508| 		return true;
+  509| 	return false;
+  510| }
+  511| 
+  512| bool CItemBase::IsID_Ship( ITEMID_TYPE id ) noexcept
+  513| {
+  514| 	// IT_SHIP
+  515| 	return ( id >= ITEMID_MULTI && id <= ITEMID_GALLEON_BRIT2_W );
+  516| }
+  517| 
+  518| bool CItemBase::IsID_GamePiece( ITEMID_TYPE id ) noexcept // static
+  519| {
+  520| 	return ( id >= ITEMID_GAME1_CHECKER && id <= ITEMID_GAME_HI );
+  521| }
+  522| 
+  523| bool CItemBase::IsID_Track( ITEMID_TYPE id ) noexcept // static
+  524| {
+
+// ----- lines 838-858 -----
+  838| 		*uiBlockFlags = 0;
+  839| 		return 0;	// have no effective height if they don't block.
+  840| 	}
+  841| 	return GetItemHeightFlags( tiledata, uiBlockFlags );
+  842| }
+  843| 
+  844| IT_TYPE CItemBase::GetTypeBase( ITEMID_TYPE id, const CUOItemTypeRec_HS &tiledata ) // static
+  845| {
+  846| 	ADDTOCALLSTACK("CItemBase::GetTypeBase");
+  847| 	if ( IsID_Ship( id ) )
+  848| 		return IT_SHIP;
+  849| 	if ( IsID_Multi( id ) )
+  850| 		return IT_MULTI;
+  851| 
+  852| 	if (( tiledata.m_flags & UFLAG1_BLOCK ) && (tiledata.m_flags & UFLAG1_WATER))
+  853| 		return IT_WATER;
+  854| 	if ( IsID_WaterFish( id ) ) // UFLAG1_WATER
+  855| 		return IT_WATER;
+  856| 
+  857| 	if (( tiledata.m_flags & UFLAG4_DOOR ) || IsID_Door( id ))
+  858| 	{
+
+// ----- lines 1141-1170 -----
+ 1141| 			sVal.FormatLLVal(GetDefNum(ptcKey));
+ 1142| 			break;
+ 1143| 
+ 1144| 
+ 1145| 		case IBC_MAXAMOUNT:
+ 1146| 			sVal.FormatVal(GetMaxAmount());
+ 1147| 			break;
+ 1148| 
+ 1149| 		case IBC_SPEEDMODE:
+ 1150| 		{
+ 1151| 			if (!IsType(IT_SHIP))
+ 1152| 				return false;
+ 1153| 			CItemBaseMulti * pItemMulti = dynamic_cast<CItemBaseMulti*>(this);
+ 1154| 			ASSERT(pItemMulti);
+ 1155| 			sVal.FormatVal(pItemMulti->m_SpeedMode);
+ 1156| 		}
+ 1157| 		break;
+ 1158| 		case IBC_SHIPSPEED:
+ 1159| 		{
+ 1160| 			if (!IsType(IT_SHIP))
+ 1161| 				return false;
+ 1162| 			ptcKey += 9;
+ 1163| 			CItemBaseMulti * pItemMulti = dynamic_cast<CItemBaseMulti*>(this);
+ 1164| 			ASSERT(pItemMulti);
+ 1165| 
+ 1166| 			if (*ptcKey == '.')
+ 1167| 			{
+ 1168| 				++ptcKey;
+ 1169| 				if (!strnicmp(ptcKey, "TILES", 5))
+ 1170| 				{
+
+// ----- lines 1481-1505 -----
+ 1481| 		case IBC_NPCKILLERAMT:
+ 1482| 		case IBC_NPCPROTECTIONAMT:
+ 1483| 			SetDefNum(s.GetKey(), s.GetArgVal(), false);
+ 1484| 			break;
+ 1485| 		case IBC_MAXAMOUNT:
+ 1486| 			if (!SetMaxAmount(s.GetArgUSVal()))
+ 1487| 				return false;
+ 1488| 			break;
+ 1489| 		case IBC_SPEEDMODE:
+ 1490| 		{
+ 1491| 			if (!IsType(IT_SHIP))
+ 1492| 				return false;
+ 1493| 			CItemBaseMulti *pItemMulti = dynamic_cast<CItemBaseMulti*>(this);
+ 1494| 			ASSERT(pItemMulti);
+ 1495|             ShipMovementSpeed speed = (ShipMovementSpeed)s.GetArgBVal();
+ 1496| 			if (speed > SMS_FAST)
+ 1497| 				speed = SMS_FAST;
+ 1498| 			else if (speed < SMS_NORMAL)
+ 1499| 				speed = SMS_NORMAL;	//Max = 4, Min = 1.
+ 1500| 			pItemMulti->m_SpeedMode = speed;
+ 1501| 		}break;
+ 1502| 		case IBC_SHIPSPEED:
+ 1503| 		{
+ 1504| 			ptcKey += 9;
+ 1505| 			if (*ptcKey == '.')
+
+// ----- lines 2083-2103 -----
+ 2083| 			m_Offset.m_dz = (char)(ppArgs[2]);
+ 2084| 		} break;
+ 2085|         case MLC_MULTIREGION:
+ 2086|             MakeMultiRegion(this, s);
+ 2087|             break;
+ 2088|         case MLC_REGIONFLAGS:
+ 2089|             m_dwRegionFlags = s.GetArgDWVal();
+ 2090|             break;
+ 2091|         case MLC_SHIPSPEED:
+ 2092|         {
+ 2093|             if (!IsType(IT_SHIP))	// only valid for ships
+ 2094|                 return false;
+ 2095| 
+ 2096|             // SHIPSPEED x[,y]
+ 2097|             int64 ppArgs[2];
+ 2098|             size_t iQty = Str_ParseCmds(s.GetArgRaw(), ppArgs, ARRAY_COUNT(ppArgs));
+ 2099|             if (iQty < 1)
+ 2100|                 return false;
+ 2101| 
+ 2102|             _shipSpeed.period = (uchar)(ppArgs[0]);
+ 2103| 
+
+// ----- lines 2203-2223 -----
+ 2203| 			sVal.Format("%d,%d,%d", m_Offset.m_dx, m_Offset.m_dy, m_Offset.m_dz);
+ 2204| 			return true;
+ 2205|         case MLC_MULTIREGION:
+ 2206|             sVal.Format("%d,%d,%d,%d", m_rect.m_left, m_rect.m_top, m_rect.m_right - 1, m_rect.m_bottom - 1);
+ 2207|             return true;
+ 2208|         case MLC_REGIONFLAGS:
+ 2209|             sVal.FormatHex(m_dwRegionFlags);
+ 2210|             return true;
+ 2211|         case MLC_SHIPSPEED:
+ 2212|         {
+ 2213|             if (!IsType(IT_SHIP))
+ 2214|                 return false;
+ 2215| 
+ 2216|             ptcKey += 9;
+ 2217|             if (*ptcKey == '.')
+ 2218|             {
+ 2219|                 ++ptcKey;
+ 2220|                 if (!strnicmp(ptcKey, "TILES", 5))
+ 2221|                 {
+ 2222|                     sVal.FormatVal(_shipSpeed.tiles);
+ 2223|                     break;

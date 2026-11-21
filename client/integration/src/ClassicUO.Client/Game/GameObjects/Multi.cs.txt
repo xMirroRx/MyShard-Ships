@@ -1,0 +1,25 @@
+// Excerpt of MyShard-Client/src/ClassicUO.Client/Game/GameObjects/Multi.cs
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 27-47 -----
+   27|         private ushort _originalGraphic;
+   28| 
+   29| 
+   30|         public string Name => ItemData.Name;
+   31| 
+   32|         public ref StaticTiles ItemData => ref Client.Game.UO.FileManager.TileData.StaticData[Graphic];
+   33|         public bool IsCustom;
+   34|         public bool IsVegetation;
+   35| 
+   36|         // MyShard: serial of the multi (house/ship) this component belongs to — set by House when the component is
+   37|         // added. Used to glow a whole Store-purchased ship (ShipGlowManager keys by ship serial).
+   38|         public uint OwnerSerial;
+   39|         public int MultiOffsetX;
+   40|         public int MultiOffsetY;
+   41|         public int MultiOffsetZ;
+   42|         public bool IsMovable;
+   43|         public CUSTOM_HOUSE_MULTI_OBJECT_FLAGS State = 0;
+   44|         public bool ForceTransparentHouse;
+   45|         public static byte ForcedTransparency = 40;
+   46| 
+   47| 

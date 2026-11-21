@@ -1,0 +1,121 @@
+// Excerpt of MyShard-Server/src/game/items/CItem.h
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 165-195 -----
+  165| 			dword m_more1;
+  166| 			dword m_more2;
+  167|             CPointBase m_morep;
+  168| 		} m_itNormal;
+  169| 
+  170| 		// IT_CONTAINER
+  171| 		// IT_CONTAINER_LOCKED
+  172| 		// IT_DOOR
+  173| 		// IT_DOOR_OPEN
+  174| 		// IT_DOOR_LOCKED
+  175| 		// IT_SHIP_SIDE
+  176| 		// IT_SHIP_SIDE_LOCKED
+  177| 		// IT_SHIP_HOLD
+  178| 		// IT_SHIP_HOLD_LOCK
+  179| 		struct	// IsTypeLockable()
+  180| 		{
+  181| 			CUID m_UIDLock;			// more1=the lock code. normally this is the same as the uid (magic lock=non UID)
+  182| 			dword m_dwLockComplexity;	// more2=0-1000 = How hard to pick or magic unlock. (conflict with door ?)
+  183| 		} m_itContainer;
+  184| 
+  185| 		// IT_SHIP_TILLER
+  186| 		// IT_KEY
+  187| 		// IT_SIGN_GUMP
+  188| 		struct
+  189| 		{
+  190| 			CUID m_UIDLock;			// more1 = the lock code. Normally this is the UID, except if uidLink is set.
+  191| 		} m_itKey;
+  192| 
+  193| 		// IT_EQ_BANK_BOX
+  194| 		struct
+  195| 		{
+
+// ----- lines 427-464 -----
+  427| 			word m_Action;		// more1l = NPC_MEM_ACT_TYPE What sort of action is this memory about ? (1=training, 2=hire, etc)
+  428| 			word m_Skill;		// more1h = SKILL_TYPE = training a skill ?
+  429| 			dword m_junk2;		// more2 = It was the start time of the memory, now it's in TIMESTAMP (for int64 support)
+  430|             CPointBase m_pt;    // morep = Location the memory occured.
+  431| 								// m_uidLink = what is this memory linked to. (must be valid)
+  432|                                 // TIMESTAMP = When did the fight start or action take place?
+  433| 		} m_itEqMemory;
+  434| 
+  435| 		// IT_MULTI
+  436| 		// IT_MULTI_CUSTOM
+  437| 		// IT_SHIP
+  438| 		struct
+  439| 		{
+  440| 			CUID m_UIDCreator;	// more1 = who created this house or ship ?
+  441|             ShipMovementType _eMovementType;	// more2 & 0x000000FF. From packet 0xBF.0x32: 0 = Stop Movement, 1 = One Tile Movement, 2 = Normal Movement
+  442| 			byte m_fAnchored;
+  443| 			byte m_DirMove;			// DIR_TYPE
+  444| 			byte m_DirFace;
+  445| 			// uidLink = my IT_SHIP_TILLER or IT_SIGN_GUMP,
+  446| 			CUID m_Pilot;
+  447| 		} m_itShip;
+  448| 
+  449| 		// IT_SHIP_PLANK
+  450| 		struct
+  451| 		{
+  452| 			CUID m_UIDLock;			// more1 = the lock code. normally this is the same as the uid (magic lock=non UID)
+  453| 			dword m_dwLockComplexity;	// more2=0-1000 = How hard to pick or magic unlock. (conflict with door ?)
+  454| 			word m_wSideType;			// morex = type to become (IT_SHIP_SIDE or IT_SHIP_SIDE_LOCKED)
+  455| 		} m_itShipPlank;
+  456| 
+  457| 		// IT_PORTCULIS
+  458| 		// IT_PORT_LOCKED
+  459| 		struct
+  460| 		{
+  461| 			int32 m_z1;			// more1 = The down z height.
+  462| 			int32 m_z2;			// more2 = The up z height.
+  463| 		} m_itPortculis;
+  464| 
+
+// ----- lines 597-617 -----
+  597|     void DeleteCleanup(bool fForce) NONVIRTUAL;
+  598| public:
+  599| 	virtual bool NotifyDelete(); // overridden CItemContainer:: method
+  600| 	virtual bool Delete(bool fForce = false) override;
+  601| 
+  602| protected:
+  603| 	virtual void _GoAwake() override;
+  604| 	virtual void _GoSleep() override;
+  605| 
+  606| 	// On CItem, _OnTick is virtual also because we need to call the topmost superclass:
+  607| 	//	a CItem can be the base class for CItemShip, CItemMessage...
+  608| public:
+  609| 	virtual bool _OnTick() override;
+  610| 
+  611|     virtual bool _CanTick(bool fParentGoingToSleep) const override final;
+  612| 	bool _CanHoldTimer() const;
+  613| 
+  614|     virtual void DupeCopy( const CObjBase * pItem ) override;
+  615| 
+  616| 	static CItem * CreateBase( ITEMID_TYPE id, IT_TYPE type = IT_INVALID ); // If type == IT_INVALID, read the type from the def (default behaviour)
+  617| 	static CItem * CreateHeader( tchar * pArg, CObjBase * pCont = nullptr, bool fDupeCheck = false, CChar * pSrc = nullptr );
+
+// ----- lines 895-915 -----
+  895| 	int Weapon_GetAttack(bool bGetRange = true) const;
+  896| 	SKILL_TYPE Weapon_GetSkill() const;
+  897| 	SOUND_TYPE Weapon_GetSoundHit() const;
+  898| 	SOUND_TYPE Weapon_GetSoundMiss() const;
+  899| 	void Weapon_GetRangedAmmoAnim(ITEMID_TYPE &id, dword &hue, dword &render);
+  900| 	CResourceID Weapon_GetRangedAmmoRes();
+  901| 	CItem *Weapon_FindRangedAmmo(const CResourceID& id);
+  902| 
+  903| 	bool IsMemoryTypes( word wType ) const;
+  904| 
+  905| 	bool Ship_Plank( bool fOpen );
+  906| 
+  907| 	void Plant_SetTimer();
+  908| 	bool Plant_OnTick();
+  909| 	void Plant_CropReset();
+  910| 	bool Plant_Use( CChar * pChar );
+  911|     bool Plant_SetID(ITEMID_TYPE id);
+  912| 
+  913| 	CItem * UnStackSplit( word amount, CChar * pCharSrc = nullptr );
+  914| };
+  915| 

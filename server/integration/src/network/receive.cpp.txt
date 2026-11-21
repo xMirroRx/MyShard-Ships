@@ -1,0 +1,89 @@
+// Excerpt of MyShard-Server/src/network/receive.cpp
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 4-24 -----
+    4| //#include "../common/CScriptParserBufs.h" // included in the precompiled header via CExpression.h
+    5| #include "../common/CLog.h"
+    6| #include "../common/CUOClientVersion.h"
+    7| #include "../game/uo_files/uofiles_enums_creid.h"
+    8| #include "../game/chars/CChar.h"
+    9| #include "../game/clients/CClient.h"
+   10| #include "../game/items/CItemContainer.h"
+   11| #include "../game/items/CItemMap.h"
+   12| #include "../game/items/CItemMessage.h"
+   13| #include "../game/items/CItemMultiCustom.h"
+   14| #include "../game/items/CItemShip.h"
+   15| #include "../game/items/CItemVendable.h"
+   16| #include "../game/CServer.h"
+   17| #include "../game/CDuelManager.h"
+   18| #include "../game/CWorldGameTime.h"
+   19| #include "../game/CWorldMap.h"
+   20| #include "../game/triggers.h"
+   21| #include "CClientIterator.h"
+   22| #include "CNetState.h"
+   23| #include <string>
+   24| #include <thread>
+
+// ----- lines 3868-3893 -----
+ 3868| 
+ 3869| 		ClientIterator it;
+ 3870| 		for (CClient* pTo = it.next(); pTo != nullptr; pTo = it.next())
+ 3871| 		{
+ 3872| 			if (pTo->GetChar() == nullptr)
+ 3873| 				continue;
+ 3874| 
+ 3875| 			new PacketWeaponGlow(pTo, dwSerial, wMask);
+ 3876| 		}
+ 3877| 	}
+ 3878| 	else if (type == 34)				// ShipGlow — store the player's applied ship-glow bitmask (used on piloting)
+ 3879| 	{
+ 3880| 		word wMask = readInt16();
+ 3881| 		pChar->SetKeyNum("SHIPGLOW", wMask);
+ 3882| 	}
+ 3883| 	else if (type == 39)				// ShipDye — store the player's applied ship-dye HUE (used on piloting; 0 = none)
+ 3884| 	{
+ 3885| 		word wHue = readInt16();
+ 3886| 		pChar->SetKeyNum("SHIPDYE", wHue);
+ 3887| 	}
+ 3888| 	else if (type == 41)				// MountDye — store the player's mount-dye HUE + relay to EVERYONE (their mount recolours)
+ 3889| 	{
+ 3890| 		word wHue = readInt16();
+ 3891| 		pChar->SetKeyNum("MOUNTDYE", wHue);   // stored so it re-sends when a player enters view (addChar)
+ 3892| 
+ 3893| 		dword dwSerial = pChar->GetUID();
+
+// ----- lines 4051-4084 -----
+ 4051| 	//CUID from(serial &~ UID_F_RESOURCE); //do we need this? CNetState provides the player character
+ 4052| 
+ 4053| 	DIR_TYPE facing = static_cast<DIR_TYPE>(readByte()); //new boat facing, yes client send it
+ 4054| 	DIR_TYPE moving = static_cast<DIR_TYPE>(readByte()); //the boat movement
+ 4055| 	//skip(1);
+ 4056| 	byte bMovementType = readByte(); //(0 = Stop Movement, 1 = One Tile Movement, 2 = Normal Movement) ***These speeds are NOT the same as 0xF6 packet
+ 4057| 
+ 4058| 	CRegionWorld *area = character->m_pArea;
+ 4059| 	if (area && area->IsFlag(REGION_FLAG_SHIP))
+ 4060| 	{
+ 4061| 		CItemShip *pShipItem = dynamic_cast<CItemShip *>(area->GetResourceID().ItemFindFromResource());
+ 4062| 		if (pShipItem && (pShipItem->m_itShip.m_Pilot == character->GetUID()))
+ 4063| 		{
+ 4064| 			//direction of movement = moving - ship_face
+ 4065| 			//	moving = read from packet
+ 4066| 			//	ship_face = pShipItem->Ship_Face()
+ 4067| 
+ 4068| 			//Ship_* need to be private? there is another way to ask the ship to move?
+ 4069| 			//pShipItem->Ship_Move(static_cast<DIR_TYPE>((moving - pShipItem->m_itShip.m_DirFace)), pShipItem->_shipSpeed.tiles);
+ 4070| 
+ 4071| 			if ((facing == DIR_N || facing == DIR_E || facing == DIR_S || facing == DIR_W) && pShipItem->m_itShip.m_DirFace != facing) //boat cannot face intermediate directions
+ 4072| 				pShipItem->Face(moving);
+ 4073| 
+ 4074| 			if (pShipItem->SetMoveDir(facing, (ShipMovementType)bMovementType, true)) //pShipItem->m_itShip.m_DirMove = (byte)(facing);
+ 4075| 				pShipItem->Move(moving, bMovementType);
+ 4076| 		}
+ 4077| 		else
+ 4078| 			return false;
+ 4079| 	}
+ 4080| 
+ 4081| 	return true;
+ 4082| }
+ 4083| 
+ 4084| 

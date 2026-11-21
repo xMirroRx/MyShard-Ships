@@ -1,0 +1,92 @@
+// Excerpt of MyShard-Server/src/game/CSectorBase.cpp
+// Only the ship related parts, with their line numbers in the source file.
+
+// ----- lines 1-16 -----
+    1| //#include "../common/CException.h" // included in the precompiled header
+    2| #include "../common/CLog.h"
+    3| #include "../common/CRect.h"
+    4| #include "../game/CWorld.h"
+    5| #include "chars/CChar.h"
+    6| #include "items/CItemShip.h"
+    7| #include "CSectorList.h"
+    8| #include "CWorldGameTime.h"
+    9| #include "CSectorBase.h"
+   10| #include <algorithm>
+   11| 
+   12| 
+   13| ////////////////////////////////////////////////////////////////////////
+   14| // -CCharsDisconnectList
+   15| 
+   16| CCharsDisconnectList::CCharsDisconnectList() = default;
+
+// ----- lines 81-101 -----
+   81| void CItemsList::OnRemoveObj(CSObjContRec* pObjRec)
+   82| {
+   83| 	ADDTOCALLSTACK("CItemsList::OnRemoveObj");
+   84|     DEBUG_ASSERT(nullptr != dynamic_cast<const CItem*>(pObjRec));
+   85| 
+   86| 	// Item is picked up off the ground. (may be put right back down though)
+   87| 	CItem * pItem = static_cast<CItem*>(pObjRec);
+   88| 
+   89| 	if ( ! sm_fNotAMove )
+   90| 	{
+   91| 		pItem->OnMoveFrom();	// IT_MULTI, IT_SHIP and IT_COMM_CRYSTAL
+   92| 	}
+   93| 
+   94|     // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage) (It's intentional that we don't check it everytime)
+   95| 	DEBUG_ASSERT(pObjRec->GetParent() == this);
+   96| 	CSObjCont::OnRemoveObj(pObjRec);
+   97| 	DEBUG_ASSERT(pObjRec->GetParent() == nullptr);
+   98| 
+   99| 	pItem->SetUIDContainerFlags(UID_O_DISCONNECT);	// It is no place for the moment.
+  100| }
+  101| 
+
+// ----- lines 302-325 -----
+  302| 	// REGION_TYPE_MULTI => RES_WORLDITEM = UID linked types in general = CRegionWorld
+  303| 
+  304|     const size_t uiQty = m_RegionLinks.size();
+  305|     for ( size_t i = 0; i < uiQty; ++i )
+  306| 	{
+  307| 		CRegion * pRegion = m_RegionLinks[i];
+  308| 		ASSERT(pRegion);
+  309| 
+  310|         const CResourceID& ridRegion = pRegion->GetResourceID();
+  311| 		ASSERT( ridRegion.IsValidUID());
+  312| 		const CItemShip * pShipItem = nullptr;
+  313| 		if ( ridRegion.IsUIDItem())
+  314| 		{
+  315| 			pShipItem = dynamic_cast <CItemShip *>(ridRegion.ItemFindFromResource());
+  316| 			if (pShipItem)
+  317| 			{
+  318| 				if (!(dwType & REGION_TYPE_SHIP))
+  319| 					continue;
+  320| 			}
+  321| 			else if (!(dwType & REGION_TYPE_HOUSE))
+  322| 				continue;
+  323| 		}
+  324| 		else if ( ridRegion.GetResType() == RES_AREA )
+  325| 		{
+
+// ----- lines 351-371 -----
+  351|     const size_t uiQty = m_RegionLinks.size();
+  352|     for ( size_t i = 0; i < uiQty; ++i )
+  353| 	{
+  354| 		CRegion * pRegion = m_RegionLinks[i];
+  355| 		ASSERT(pRegion);
+  356| 
+  357|         const CResourceID& ridRegion = pRegion->GetResourceID();
+  358| 		ASSERT(ridRegion.IsValidUID());
+  359| 		if (ridRegion.IsUIDItem())
+  360| 		{
+  361| 			const CItemShip * pShipItem = dynamic_cast <const CItemShip *>(ridRegion.ItemFindFromResource());
+  362| 			if (pShipItem)
+  363| 			{
+  364| 				if (!(dwType & REGION_TYPE_SHIP))
+  365| 					continue;
+  366| 			}
+  367| 			else if (!(dwType & REGION_TYPE_HOUSE))
+  368| 				continue;
+  369| 		}
+  370| 		else if (ridRegion.GetResType() == RES_AREA )
+  371| 		{
